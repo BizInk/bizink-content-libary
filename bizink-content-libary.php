@@ -4,7 +4,7 @@
  Plugin URI:  https://portal.bizinkonline.com/
  Description: 
  Author:      Jayden Major
- Version:     0.1.3
+ Version:     0.1.4
  Author URI:  https://portal.bizinkonline.com/
  Text Domain: bizink-content
  License:     GPLv2 or later
