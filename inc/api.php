@@ -15,7 +15,7 @@ function bcl_calculator_code(WP_POST $post, array $fields)
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<title><?php echo $post->post_title; ?></title>
-		<script async src="<?php echo get_theme_file_uri('/dist/resizer.js'); ?>"></script>
+		<script async src="https://portal.bizinkonline.com/resizer.js"></script>
 		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
 		<link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap" />
 		<link rel="stylesheet" type="text/css" href="https://smartbizcalcs.com/css/style.css" />
