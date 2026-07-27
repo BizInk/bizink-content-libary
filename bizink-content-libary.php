@@ -104,3 +104,9 @@ function register_topics_taxonomy(): void {
     ]);
 }
 add_action('init', __NAMESPACE__ . '\\register_topics_taxonomy');
+
+// Theme Updater
+require 'plugin-update-checker/plugin-update-checker.php';
+use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
+$myUpdateChecker = PucFactory::buildUpdateChecker('https://github.com/BizInk/bizink-content-libary',__FILE__,'bizink-content-libary');
+$myUpdateChecker->setBranch('master');

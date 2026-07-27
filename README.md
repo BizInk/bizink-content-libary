@@ -1,1 +1,1 @@
-# bizink-content-libary
+# Bizink Content Libary
