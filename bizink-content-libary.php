@@ -1,12 +1,14 @@
 <?php
 /*
-Theme Name: BCL Portal
-Theme URI: https://portal.bizinkonline.com/
-Description: 
-Author: Jayden Major
-Version: 0.1
-Text Domain: bizink-content
-*/
+ Plugin Name: BCL Portal
+ Plugin URI:  https://portal.bizinkonline.com/
+ Description: 
+ Author:      Jayden Major
+ Version:     0.1
+ Author URI:  https://portal.bizinkonline.com/
+ Text Domain: bizink-content
+ License:     GPLv2 or later
+ */
 
 defined('ABSPATH') || exit;
 
