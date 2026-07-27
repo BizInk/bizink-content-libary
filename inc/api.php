@@ -2,7 +2,7 @@
 
 defined('ABSPATH') || exit;
 
-
+ini_set('max_execution_time', '300');
 
 function bcl_calculator_code(WP_POST $post, array $fields)
 {
@@ -256,7 +256,6 @@ const content = [
     },
   },
 ];
-
         </script>
 		<?php
 		echo $fields['head_code'] ?? '';
