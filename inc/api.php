@@ -274,7 +274,8 @@ const content = [
 
 	</html>
 <?php
-	$content = ob_end_flush();
+	$content = ob_get_contents();
+	ob_end_clean();
 	return $content;
 }
 
