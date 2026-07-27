@@ -18,10 +18,10 @@ require_once __DIR__ . '/inc/simple-membership.php';
 
 // Store ACF JSON in theme so it's version-controlled.
 add_filter('acf/settings/save_json', function() {
-    return get_stylesheet_directory() . '/acf-json';
+    return plugin_dir_path( __FILE__ ) . '/acf-json';
 });
 add_filter('acf/settings/load_json', function($paths) {
-    $paths[] = get_stylesheet_directory() . '/acf-json';
+    $paths[] = plugin_dir_path( __FILE__ ) . '/acf-json';
     return $paths;
 });
 
