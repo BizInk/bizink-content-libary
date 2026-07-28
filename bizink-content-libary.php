@@ -4,7 +4,7 @@
  Plugin URI:  https://portal.bizinkonline.com/
  Description: 
  Author:      Jayden Major
- Version:     0.1.4
+ Version:     0.1.5
  Author URI:  https://portal.bizinkonline.com/
  Text Domain: bizink-content
  License:     GPLv2 or later
@@ -13,8 +13,11 @@
 defined('ABSPATH') || exit;
 
 require_once __DIR__ . '/inc/template-functions.php';
+require_once __DIR__ . '/inc/analytics_db.php';
 require_once __DIR__ . '/inc/api.php';
 require_once __DIR__ . '/inc/simple-membership.php';
+
+register_activation_hook(__FILE__, 'bcl_create_database_table');
 
 // Store ACF JSON in theme so it's version-controlled.
 add_filter('acf/settings/save_json', function() {
@@ -63,6 +66,7 @@ function register_content_types(): void {
             'public'            => true,
             'show_in_rest'      => true,
             'has_archive'       => false,
+            'menu_postion'      => 5,
             'menu_icon'         => $meta['icon'],
             'supports'          => $slug == 'bcl_article' ? ['title', 'editor', 'excerpt', 'thumbnail', 'revisions']:['title', 'thumbnail', 'revisions'],
             'taxonomies'        => ['bcl_topic'],

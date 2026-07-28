@@ -24,10 +24,6 @@ function bcl_calculator_code(WP_POST $post, array $fields)
 		
 		<style>
 			/** brand.css */
-			.bizinkEmbed {
-				padding: 2rem;
-			}
-
 			.bizinkEmbed .TSBCcontainer {
 				border: solid 1px var(--brand-tab-border-color);
 			}
@@ -543,6 +539,58 @@ function bcl_content_item_all(WP_REST_Request $request)
     }
 }
 
+function bcl_request_origin_host()
+{
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? $_SERVER['HTTP_REFERER'] ?? '';
+    $host = parse_url($origin, PHP_URL_HOST);
+    return $host ? strtolower($host) : '';
+}
+
+function bcl_is_embed_domain_allowed($content_id, $username)
+{
+    $username = sanitize_user($username, true);
+    if (empty($username) || !function_exists('get_fields')) {
+        return true;
+    }
+
+    $user = get_user_by('login', $username);
+    if (!$user) {
+        return true;
+    }
+
+    $fields  = get_fields('user_' . $user->ID);
+    $domains = (array) ($fields['domains']['allowed_domains'] ?? []);
+    $domains = array_filter($domains, function ($row) use ($content_id) {
+        return absint($row['content_id'] ?? 0) === (int) $content_id;
+    });
+
+    // No domains registered for this content -> unrestricted.
+    if (empty($domains)) {
+        return true;
+    }
+
+    $host = bcl_request_origin_host();
+
+    // Local/dev testing is always allowed.
+    if (empty($host) || in_array($host, ['localhost', '127.0.0.1', '::1'], true)) {
+        return true;
+    }
+
+    foreach ($domains as $row) {
+        $allowed = strtolower(trim($row['url'] ?? ''));
+        $allowed = preg_replace('#^https?://#', '', $allowed);
+        $allowed = rtrim($allowed, '/');
+        if ($allowed === '') {
+            continue;
+        }
+        if ($host === $allowed || $host === 'www.' . $allowed || ('www.' . $host) === $allowed) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 function bcl_content_embed(WP_REST_Request $request)
 {
     $parameters = $request->get_params();
@@ -556,6 +604,16 @@ function bcl_content_embed(WP_REST_Request $request)
     if (function_exists('get_fields')) {
         $post = get_post($parameters['id']);
         $fields = get_fields($post->ID);
+
+        if (!bcl_is_embed_domain_allowed($post->ID, $parameters['comp'] ?? '')) {
+            $response = new WP_REST_Response(array(
+                "title" => $post->post_title,
+                "content" => "",
+            ), 200);
+            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+            return $response;
+        }
+
         $response = new WP_REST_Response(array(
             "title" => $post->post_title,
             "content" => bcl_calculator_code($post,$fields),
@@ -570,6 +628,26 @@ function bcl_content_embed(WP_REST_Request $request)
     }
 }
 
+function bcl_get_user_content_settings($user_id, $content_id)
+{
+    if (empty($user_id) || empty($content_id)) {
+        return array();
+    }
+
+    $prefix = 'content_settings_' . $content_id . '_';
+    $prefix_len = strlen($prefix);
+
+    $settings = array();
+    foreach (get_user_meta($user_id) as $meta_key => $meta_value) {
+        if (strncmp($meta_key, $prefix, $prefix_len) === 0) {
+            $field_name = substr($meta_key, $prefix_len);
+            $settings[$field_name] = maybe_unserialize($meta_value[0]);
+        }
+    }
+
+    return $settings;
+}
+
 function bcl_content_item(WP_REST_Request $request)
 {
     $parameters = $request->get_params();
@@ -582,17 +660,24 @@ function bcl_content_item(WP_REST_Request $request)
     if (function_exists('get_fields')) {
         $post = get_post($parameters['id']);
         $fields = get_fields($post->ID);
-        
-        $user_fields= get_fields('user_' . get_current_user_id());
+
+        $user_id = get_current_user_id();
+        $user_fields = get_fields('user_' . $user_id);
         $domains = (array) ($user_fields['domains']['allowed_domains'] ?? []);
 
+        // Per-user, per-content overrides (not managed via ACF; stored as user meta
+        // keyed 'content_settings_{content_id}_{field_name}'). Anything not set here
+        // falls back to the content's own $fields.
+        $user_settings = bcl_get_user_content_settings($user_id, $post->ID);
+        $calculator_fields = array_merge($fields, $user_settings);
 
         $data = array(
             "id" => $post->ID,
             "title" => $post->post_title,
-            "content" => bcl_calculator_code($post,$fields),
+            "content" => bcl_calculator_code($post, $calculator_fields),
             "excerpt" => $post->post_excerpt,
             "published_date" => $post->post_date,
+            "user_settings" => $user_settings,
             "meta" => array(
                 "content_type" => $post->post_type,
                 "allowed_domains" => $domains ?? []
@@ -626,34 +711,88 @@ function bcl_content_item(WP_REST_Request $request)
     }
 }
 
+function bcl_update_address_fields(array $address, string $field_prefix, $user)
+{
+    foreach (array('line_1', 'line_2', 'city', 'state', 'postal_code', 'country') as $key) {
+        if (isset($address[$key])) {
+            update_field($field_prefix . '_' . $key, sanitize_text_field($address[$key]), 'user_' . $user);
+        }
+    }
+}
+
+function bcl_get_address_fields(array $fields, string $group_name)
+{
+    return array(
+        "line_1" => $fields[$group_name]['line_1'] ?? "",
+        "line_2" => $fields[$group_name]['line_2'] ?? "",
+        "city" => $fields[$group_name]['city'] ?? "",
+        "state" => $fields[$group_name]['state'] ?? "",
+        "postal_code" => $fields[$group_name]['postal_code'] ?? "",
+        "country" => $fields[$group_name]['country'] ?? "",
+    );
+}
+
 function bcl_firm(WP_REST_Request $request)
 {
     $user = get_current_user_id();
-    if ($user) {
-        if (function_exists('get_fields')) {
-            $fields = get_fields('user_' . $user);
-            // TODO: Get Brand Details
-            $response = new WP_REST_Response(array(
-                "firm_name" => $fields['brand_kit']['brand_name'] ?? "Test Brand",
-                "plan" => "Test Plan",
-                "next_billing_date" => "N/A",
-                "card_last4" => "N/A",
-                "logo_url" => $fields['brand_kit']['brand_logo'],
-                "website" => $fields['brand_kit']['website'] ?? "",
-                "primary_color" => $fields['brand_kit']['primary_color'] ?? "#1F4E79",
-                "accent_color" =>  $fields['brand_kit']['accent_color'] ?? "#2E75B6",
-                "fields" => $fields
-            ), 200);
-            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-            return $response;
-        } else {
-            bcl_noAcfResponce();
-        }
-    } else {
+    if (!$user) {
         $response = new WP_REST_Response(array("message" => "User Not Found"), 404);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
+
+    if (!function_exists('get_fields')) {
+        return bcl_noAcfResponce();
+    }
+
+    if ($request->get_method() === 'PATCH') {
+        if (!function_exists('update_field')) {
+            return bcl_noAcfResponce();
+        }
+
+        $data = json_decode($request->get_body(), true);
+        if (!is_array($data)) {
+            $response = new WP_REST_Response(array("message" => "Invalid or empty request body"), 400);
+            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+            return $response;
+        }
+
+        if (isset($data['firm_name'])) {
+            update_field('brand_kit_brand_name', htmlspecialchars($data['firm_name'], ENT_QUOTES), 'user_' . $user);
+        }
+        if (isset($data['website'])) {
+            update_field('brand_kit_website', filter_var($data['website'], FILTER_SANITIZE_URL, FILTER_NULL_ON_FAILURE), 'user_' . $user);
+        }
+        if (isset($data['primary_color'])) {
+            update_field('brand_kit_primary_color', htmlspecialchars($data['primary_color'], ENT_QUOTES), 'user_' . $user);
+        }
+        if (isset($data['accent_color'])) {
+            update_field('brand_kit_accent_color', htmlspecialchars($data['accent_color'], ENT_QUOTES), 'user_' . $user);
+        }
+
+        if (is_array($data['address'] ?? null)) {
+            bcl_update_address_fields($data['address'], 'firm_address', $user);
+        }
+        if (is_array($data['billing_address'] ?? null)) {
+            bcl_update_address_fields($data['billing_address'], 'billing_address', $user);
+        }
+    }
+
+    $fields = get_fields('user_' . $user);
+    $response = new WP_REST_Response(array(
+        "firm_name" => $fields['brand_kit']['brand_name'] ?? "Test Brand",
+        "plan" => "Test Plan",
+        "next_billing_date" => "N/A",
+        "card_last4" => "N/A",
+        "logo_url" => $fields['brand_kit']['brand_logo'],
+        "website" => $fields['brand_kit']['website'] ?? "",
+        "primary_color" => $fields['brand_kit']['primary_color'] ?? "#1F4E79",
+        "accent_color" =>  $fields['brand_kit']['accent_color'] ?? "#2E75B6",
+        "address" => bcl_get_address_fields($fields, 'firm_address'),
+        "billing_address" => bcl_get_address_fields($fields, 'billing_address'),
+    ), 200);
+    $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+    return $response;
 }
 
 function bcl_firm_subscription(WP_REST_Request $request)
@@ -830,15 +969,98 @@ function bcl_firm_brand(WP_REST_Request $request)
     }
 }
 
+function bcl_analytics_parse_timestamp($raw)
+{
+    if (!empty($raw)) {
+        // Accept unix timestamps (seconds or milliseconds) or any strtotime-parseable string.
+        if (is_numeric($raw)) {
+            $unix = (int) $raw;
+            if ($unix > 9999999999) { // milliseconds
+                $unix = (int) ($unix / 1000);
+            }
+            return gmdate('Y-m-d H:i:s', $unix);
+        }
+        $unix = strtotime($raw);
+        if ($unix !== false) {
+            return gmdate('Y-m-d H:i:s', $unix);
+        }
+    }
+    return current_time('mysql', true);
+}
+
 function bcl_analytics(WP_REST_Request $request)
 {
     $parameters = $request->get_url_params();
-    if (empty($parameters['id'])) {
+    $content_id = absint($parameters['id'] ?? 0);
+    if (empty($content_id)) {
         $response = new WP_REST_Response(array(), 404);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
-    $response = new WP_REST_Response(array(), 200);
+
+    global $wpdb;
+    $table = $wpdb->prefix . 'bcl_analytics';
+
+    if ($request->get_method() === 'POST') {
+        $data = json_decode($request->get_body(), true);
+        if (!is_array($data)) {
+            $response = new WP_REST_Response(array("message" => "Invalid or empty request body"), 400);
+            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+            return $response;
+        }
+
+        $event = sanitize_text_field($data['event'] ?? '');
+        if (empty($event)) {
+            $response = new WP_REST_Response(array("message" => "Missing required field: event"), 400);
+            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+            return $response;
+        }
+
+        $page_url = esc_url_raw($data['pageUrl'] ?? '');
+        $time     = bcl_analytics_parse_timestamp($data['timestamp'] ?? '');
+
+        $duration = is_numeric($data['durationSeconds'] ?? null) ? round((float) $data['durationSeconds'], 2) : null;
+
+        $wpdb->insert($table, array(
+            'content_id'        => $content_id,
+            'event'             => substr($event, 0, 50),
+            'page_url'          => substr($page_url, 0, 255),
+            'duration_seconds'  => $duration,
+            'time'              => $time,
+        ), array('%d', '%s', '%s', '%f', '%s'));
+
+        $response = new WP_REST_Response(array("message" => "Event recorded"), 201);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    // GET — sum up recorded events by type for this content ID.
+    $rows = $wpdb->get_results($wpdb->prepare(
+        "SELECT event, COUNT(*) as count FROM $table WHERE content_id = %d GROUP BY event",
+        $content_id
+    ));
+
+    $totals = array();
+    $total_events = 0;
+    foreach ($rows as $row) {
+        $count = (int) $row->count;
+        $totals[$row->event] = $count;
+        $total_events += $count;
+    }
+
+    $engagement = $wpdb->get_row($wpdb->prepare(
+        "SELECT COUNT(duration_seconds) as count, SUM(duration_seconds) as total, AVG(duration_seconds) as average
+           FROM $table WHERE content_id = %d AND event = 'engagement' AND duration_seconds IS NOT NULL",
+        $content_id
+    ));
+
+    $response = new WP_REST_Response(array(
+        "content_id"      => $content_id,
+        "total_events"    => $total_events,
+        "events"          => $totals,
+        "total_engagement" => $engagement && $engagement->total !== null ? round((float) $engagement->total, 2) : 0,
+        "avg_engagement"   => $engagement && $engagement->average !== null ? round((float) $engagement->average, 2) : 0,
+    ), 200);
 
     // Set headers.
     $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
@@ -912,6 +1134,10 @@ function bcl_content_allowed_domains(WP_REST_Request $request)
     // POST — add a new url + content_id pair if not already present
     $data = json_decode($request->get_body(), true);
     $url  = filter_var($data['domain'] ?? '', FILTER_SANITIZE_URL);
+
+    $url = str_replace("https://","",$url);
+    $url = str_replace("http://","",$url);
+
 
     if (empty($url)) {
         $response = new WP_REST_Response(array("message" => "URL is required"), 400);
@@ -1073,7 +1299,7 @@ add_action('rest_api_init', function () {
         },
     ));
     register_rest_route('bcl/v1', '/firm', array(
-        'methods' => 'GET',
+        'methods' => ['GET','PATCH'],
         'callback' => 'bcl_firm',
         'permission_callback' => function () {
             return current_user_can('read');
@@ -1106,14 +1332,19 @@ add_action('rest_api_init', function () {
         },
     ));
     register_rest_route('bcl/v1', '/content/(?P<id>\d+)/analytics', array(
-        'methods' => 'GET',
+        'methods' => ['GET', 'POST'],
         'callback' => 'bcl_analytics',
-        'permission_callback' => function () {
-            return current_user_can('read');
+        'permission_callback' => function (WP_REST_Request $request) {
+            if($request->get_method() == "POST"){
+                return true;
+            }
+            else{
+                return current_user_can('read');
+            }
         },
     ));
     register_rest_route('bcl/v1', '/content/(?P<id>\d+)/allowed-domains', array(
-        'methods' => array('GET', 'POST'),
+        'methods' => array('GET', 'POST', 'DELETE'),
         'callback' => 'bcl_content_allowed_domains',
         'permission_callback' => function () {
             return current_user_can('read');
