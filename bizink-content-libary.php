@@ -2,9 +2,9 @@
 /*
  Plugin Name: BCL Portal
  Plugin URI:  https://portal.bizinkonline.com/
- Description: 
+ Description: Bizink Content Libary Server Plugin
  Author:      Jayden Major
- Version:     0.1.5
+ Version:     0.1.6
  Author URI:  https://portal.bizinkonline.com/
  Text Domain: bizink-content
  License:     GPLv2 or later

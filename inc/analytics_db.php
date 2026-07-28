@@ -2,7 +2,7 @@
 
 defined('ABSPATH') || exit;
 
-define('BCL_DB_VERSION', '1.1.0');
+define('BCL_DB_VERSION', '1.2.0');
 
 function bcl_create_database_table() {
     global $wpdb;
@@ -14,9 +14,11 @@ function bcl_create_database_table() {
         event varchar(50) NOT NULL,
         page_url varchar(255) NOT NULL DEFAULT '',
         duration_seconds decimal(10,2) DEFAULT NULL,
+        username varchar(60) NOT NULL DEFAULT '',
         time datetime NOT NULL,
         PRIMARY KEY  (id),
-        KEY content_id (content_id)
+        KEY content_id (content_id),
+        KEY username (username)
     ) $charset_collate;";
 
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';

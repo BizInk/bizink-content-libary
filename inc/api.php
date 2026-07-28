@@ -1018,26 +1018,39 @@ function bcl_analytics(WP_REST_Request $request)
 
         $page_url = esc_url_raw($data['pageUrl'] ?? '');
         $time     = bcl_analytics_parse_timestamp($data['timestamp'] ?? '');
-
         $duration = is_numeric($data['durationSeconds'] ?? null) ? round((float) $data['durationSeconds'], 2) : null;
+
+        // `comp` is the username of the account the content is embedded with.
+        $username = sanitize_user($data['comp'] ?? '', true);
 
         $wpdb->insert($table, array(
             'content_id'        => $content_id,
             'event'             => substr($event, 0, 50),
             'page_url'          => substr($page_url, 0, 255),
             'duration_seconds'  => $duration,
+            'username'          => substr($username, 0, 60),
             'time'              => $time,
-        ), array('%d', '%s', '%s', '%f', '%s'));
+        ), array('%d', '%s', '%s', '%f', '%s', '%s'));
 
         $response = new WP_REST_Response(array("message" => "Event recorded"), 201);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
 
-    // GET — sum up recorded events by type for this content ID.
+    // GET — sum up recorded events by type for this content ID, optionally scoped to one user via `comp`.
+    $query_params = $request->get_params();
+    $filter_username = sanitize_user($query_params['comp'] ?? '', true);
+
+    $where = "content_id = %d";
+    $args  = array($content_id);
+    if (!empty($filter_username)) {
+        $where .= " AND username = %s";
+        $args[] = $filter_username;
+    }
+
     $rows = $wpdb->get_results($wpdb->prepare(
-        "SELECT event, COUNT(*) as count FROM $table WHERE content_id = %d GROUP BY event",
-        $content_id
+        "SELECT event, COUNT(*) as count FROM $table WHERE $where GROUP BY event",
+        $args
     ));
 
     $totals = array();
@@ -1050,16 +1063,61 @@ function bcl_analytics(WP_REST_Request $request)
 
     $engagement = $wpdb->get_row($wpdb->prepare(
         "SELECT COUNT(duration_seconds) as count, SUM(duration_seconds) as total, AVG(duration_seconds) as average
-           FROM $table WHERE content_id = %d AND event = 'engagement' AND duration_seconds IS NOT NULL",
-        $content_id
+           FROM $table WHERE $where AND event = 'engagement' AND duration_seconds IS NOT NULL",
+        $args
     ));
+
+    // Per-user breakdown, grouped by the `comp` username stored with each event.
+    $user_rows = $wpdb->get_results($wpdb->prepare(
+        "SELECT username, event, COUNT(*) as count FROM $table WHERE $where AND username != '' GROUP BY username, event",
+        $args
+    ));
+
+    $users = array();
+    foreach ($user_rows as $row) {
+        $uname = $row->username;
+        if (!isset($users[$uname])) {
+            $users[$uname] = array(
+                "total_events"     => 0,
+                "events"           => array(),
+                "total_engagement" => 0,
+                "avg_engagement"   => 0,
+            );
+        }
+        $count = (int) $row->count;
+        $users[$uname]['events'][$row->event] = $count;
+        $users[$uname]['total_events'] += $count;
+    }
+
+    $user_engagement_rows = $wpdb->get_results($wpdb->prepare(
+        "SELECT username, SUM(duration_seconds) as total, AVG(duration_seconds) as average
+           FROM $table WHERE $where AND event = 'engagement' AND duration_seconds IS NOT NULL AND username != ''
+           GROUP BY username",
+        $args
+    ));
+
+    foreach ($user_engagement_rows as $row) {
+        $uname = $row->username;
+        if (!isset($users[$uname])) {
+            $users[$uname] = array(
+                "total_events"     => 0,
+                "events"           => array(),
+                "total_engagement" => 0,
+                "avg_engagement"   => 0,
+            );
+        }
+        $users[$uname]['total_engagement'] = $row->total !== null ? round((float) $row->total, 2) : 0;
+        $users[$uname]['avg_engagement']   = $row->average !== null ? round((float) $row->average, 2) : 0;
+    }
 
     $response = new WP_REST_Response(array(
         "content_id"      => $content_id,
         "total_events"    => $total_events,
         "events"          => $totals,
+        "views"            => $totals && $totals['views'] !== null ? $totals['views'] : 0,
         "total_engagement" => $engagement && $engagement->total !== null ? round((float) $engagement->total, 2) : 0,
         "avg_engagement"   => $engagement && $engagement->average !== null ? round((float) $engagement->average, 2) : 0,
+        "users"            => $users,
     ), 200);
 
     // Set headers.
