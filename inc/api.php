@@ -1114,7 +1114,7 @@ function bcl_analytics(WP_REST_Request $request)
         "content_id"      => $content_id,
         "total_events"    => $total_events,
         "events"          => $totals,
-        "views"            => $totals && $totals['views'] !== null ? $totals['views'] : 0,
+        "views"            => $totals && $totals['view'] !== null ? $totals['view'] : 0,
         "total_engagement" => $engagement && $engagement->total !== null ? round((float) $engagement->total, 2) : 0,
         "avg_engagement"   => $engagement && $engagement->average !== null ? round((float) $engagement->average, 2) : 0,
         "users"            => $users,
