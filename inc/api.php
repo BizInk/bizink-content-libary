@@ -817,10 +817,40 @@ function bcl_firm_team(WP_REST_Request $request)
 
 function bcl_firm_stats(WP_REST_Request $request)
 {
+    global $wpdb;
+
+    $content_types = array('bcl_article', 'bcl_ebook', 'bcl_calculator', 'bcl_tool', 'bcl_pdf', 'bcl_excel');
+
+    // New content = items of the tracked types published so far this calendar month.
+    $new_content_query = new WP_Query(array(
+        'post_type'      => $content_types,
+        'post_status'    => 'publish',
+        'posts_per_page' => 1,
+        'fields'         => 'ids',
+        'date_query'     => array(
+            array(
+                'year'  => (int) current_time('Y'),
+                'month' => (int) current_time('n'),
+            ),
+        ),
+    ));
+    $new_content = $new_content_query->found_posts;
+
+    // Active embeds = distinct content items with at least one analytics event recorded for this user.
+    $active_embeds = 0;
+    $user = wp_get_current_user();
+    if ($user && $user->exists()) {
+        $table = $wpdb->prefix . 'bcl_analytics';
+        $active_embeds = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(DISTINCT content_id) FROM $table WHERE username = %s",
+            $user->user_login
+        ));
+    }
+
     $response = new WP_REST_Response(array(
-        "new_content" => 0,
+        "new_content" => (int) $new_content,
         "downloads_ytd" => 0,
-        "active_embeds" => 0,
+        "active_embeds" => $active_embeds,
         "manual_requests" => 0
     ), 200);
 
@@ -1117,13 +1147,90 @@ function bcl_analytics(WP_REST_Request $request)
         "views"            => $totals && $totals['view'] !== null ? $totals['view'] : 0,
         "total_engagement" => $engagement && $engagement->total !== null ? round((float) $engagement->total, 2) : 0,
         "avg_engagement"   => $engagement && $engagement->average !== null ? round((float) $engagement->average, 2) : 0,
-        "users"            => $users,
     ), 200);
 
     // Set headers.
     $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
 
     return $response;
+}
+
+function bcl_content_settings(WP_REST_Request $request)
+{
+    $user_id = get_current_user_id();
+    if (!$user_id) {
+        $response = new WP_REST_Response(array("message" => "User Not Found"), 404);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    $parameters = $request->get_params();
+    $content_id  = absint($parameters['id'] ?? 0);
+    if (empty($content_id)) {
+        $response = new WP_REST_Response(array("message" => "Invalid content ID"), 400);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    if (!function_exists('get_fields') || !function_exists('update_field')) {
+        return bcl_noAcfResponce();
+    }
+
+    $post = get_post($content_id);
+    if (!$post) {
+        $response = new WP_REST_Response(array("message" => "Content not found"), 404);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    $method = $request->get_method();
+    if ($method === 'GET') {
+        // Per-user overrides fall back to the content's own ACF fields for any
+        // field the user hasn't set.
+        $fields        = get_fields($post->ID);
+        $user_settings = bcl_get_user_content_settings($user_id, $post->ID);
+        $settings      = array_merge((array) $fields, $user_settings);
+
+        $response = new WP_REST_Response(array(
+            "content_id" => $content_id,
+            "settings"   => $settings,
+        ), 200);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+    else{
+        // PATCH — update the current user's per-content setting overrides.
+        // Stored as user meta keyed 'content_settings_{content_id}_{field_name}',
+        // mirroring bcl_get_user_content_settings().
+        $data     = json_decode($request->get_body(), true);
+        $settings = (array) ($data['settings'] ?? $data);
+
+        if (empty($settings)) {
+            $response = new WP_REST_Response(array("message" => "No settings provided"), 400);
+            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+            return $response;
+        }
+
+        foreach ($settings as $field_name => $value) {
+            $field_name = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $field_name);
+            if ($field_name === '') {
+                continue;
+            }
+            $value = is_string($value) ? sanitize_text_field($value) : $value;
+            update_user_meta($user_id, 'content_settings_' . $content_id . '_' . $field_name, $value);
+        }
+
+        $fields        = get_fields($post->ID);
+        $user_settings = bcl_get_user_content_settings($user_id, $post->ID);
+        $merged        = array_merge((array) $fields, $user_settings);
+
+        $response = new WP_REST_Response(array(
+            "content_id" => $content_id,
+            "settings"   => $merged,
+        ), 200);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
 }
 
 function bcl_content_allowed_domains(WP_REST_Request $request)
@@ -1404,6 +1511,14 @@ add_action('rest_api_init', function () {
     register_rest_route('bcl/v1', '/content/(?P<id>\d+)/allowed-domains', array(
         'methods' => array('GET', 'POST', 'DELETE'),
         'callback' => 'bcl_content_allowed_domains',
+        'permission_callback' => function () {
+            return current_user_can('read');
+        },
+    ));
+
+    register_rest_route('bcl/v1', '/content/(?P<id>\d+)/settings', array(
+        'methods' => array('GET', 'POST', 'PATCH'),
+        'callback' => 'bcl_content_settings',
         'permission_callback' => function () {
             return current_user_can('read');
         },
