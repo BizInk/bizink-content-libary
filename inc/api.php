@@ -146,18 +146,16 @@ function bcl_calculator_code(WP_POST $post, array $fields)
 
             const brandContent = {
             // Currency symbol used by calculator displays
-            currencyCode: 'USD',
-            disclaimerHead: 'Disclaimer',
-            disclaimerText:
-                'Test Test Figures and results from these calculators are a general guide only and are not financial or professional advice. Consider getting professional advice before making decisions based on these results.',
+            currencyCode: $fields['currencyCode'] ?? 'USD',
+            disclaimerHead: $fields['disclaimerHead'] ?? 'Disclaimer',
+            disclaimerText: 'Figures and results from these calculators are a general guide only and are not financial or professional advice. Consider getting professional advice before making decisions based on these results.',
             // Contact information (applies to all calculators)
             contactAddress: 'Optional email address for enquiries here',
             contactText: 'Add your call to action text here.',
-            tab1: 'Calculator',
-            tab2: 'About this calculator',
-            tab3: 'Help',
-
-            tab4: 'AI Coach',
+            tab1: $fields['tabLabel1'] ?? 'Calculator',
+            tab2: $fields['tabLabel2'] ?? 'About this calculator',
+            tab3: $fields['tabLabel3'] ?? 'Help',
+            tab4: $fields['tabLabel4'] ?? 'AI Coach',
             defaultTab2Text: '<p>This section explains what this calculator does, what inputs it uses, and how to interpret the results.</p>',
             defaultTab3Text: '<p>This section provides guidance on how to use this calculator and what to consider before acting on the results.</p>',
             defaultTab4Text: '<p>Use the AI coach to ask questions about this calculator, your numbers, and how they relate to your business decisions.</p>',
@@ -467,6 +465,113 @@ function bcl_subscribe(WP_REST_Request $request)
     return $response;
 }
 
+function bcl_checkout_session(WP_REST_Request $request)
+{
+    $data = json_decode($request->get_body(), true);
+
+    if (!is_array($data)) {
+        $response = new WP_REST_Response(array("message" => "Invalid or empty request body"), 400);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    $user_id = absint($data['user_id'] ?? 0);
+    $plan    = absint($data['plan'] ?? 0);
+
+    $missing = array();
+    if (empty($user_id)) $missing[] = 'user_id';
+    if (empty($plan))    $missing[] = 'plan';
+
+    if (!empty($missing)) {
+        $response = new WP_REST_Response(array(
+            "message" => "Missing required fields: " . implode(', ', $missing),
+            "fields"  => $missing
+        ), 400);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    if (!get_userdata($user_id)) {
+        $response = new WP_REST_Response(array(
+            "message" => "User not found",
+            "fields"  => array('user_id')
+        ), 404);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    if (!function_exists('pmpro_getLevel') || !class_exists('PMProGateway_stripe')) {
+        $response = new WP_REST_Response(array("message" => "Paid Memberships Pro Stripe gateway not active"), 500);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    global $pmpro_level;
+    $pmpro_level = pmpro_getLevel($plan);
+
+    if (empty($pmpro_level)) {
+        $response = new WP_REST_Response(array(
+            "message" => "Invalid membership plan",
+            "fields"  => array('plan')
+        ), 400);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    $order = new MemberOrder();
+    $order->membership_id = $plan;
+    $order->user_id       = $user_id;
+    $order->setGateway('stripe');
+
+    // PMProGateway_stripe::pmpro_checkout_before_change_membership_level() builds the
+    // Stripe Checkout Session params correctly (price/tax/trial handling) but always
+    // finishes with wp_redirect($session->url); exit — no way to get the session back
+    // as data. So we hook the filter it applies just before calling Session::create(),
+    // capture the params, and throw to bail out before the redirect/exit happens.
+    $captured_params = null;
+    $capture = function ($params) use (&$captured_params) {
+        $captured_params = $params;
+        throw new Exception('bcl_checkout_session_capture');
+    };
+
+    add_filter('pmpro_stripe_checkout_session_parameters', $capture, PHP_INT_MAX);
+    try {
+        PMProGateway_stripe::pmpro_checkout_before_change_membership_level($user_id, $order);
+    } catch (Throwable $e) {
+        if ($e->getMessage() !== 'bcl_checkout_session_capture') {
+            remove_filter('pmpro_stripe_checkout_session_parameters', $capture, PHP_INT_MAX);
+            $response = new WP_REST_Response(array("message" => "Could not start checkout: " . $e->getMessage()), 500);
+            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+            return $response;
+        }
+    }
+    remove_filter('pmpro_stripe_checkout_session_parameters', $capture, PHP_INT_MAX);
+
+    if (empty($captured_params)) {
+        $response = new WP_REST_Response(array("message" => "Could not create checkout session"), 500);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    try {
+        $session = \Stripe\Checkout\Session::create($captured_params);
+    } catch (Throwable $e) {
+        $response = new WP_REST_Response(array("message" => "Stripe error: " . $e->getMessage()), 502);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    update_pmpro_membership_order_meta($order->id, 'stripe_checkout_session_id', $session->id);
+
+    $response = new WP_REST_Response(array(
+        "order_id"            => $order->id,
+        "checkout_session_id" => $session->id,
+        "checkout_url"        => $session->url,
+    ), 201);
+    $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+    return $response;
+}
+
 function bcl_content(WP_REST_Request $request)
 {
     $response = new WP_REST_Response(array(), 200);
@@ -595,7 +700,13 @@ function bcl_content_embed(WP_REST_Request $request)
 {
     $parameters = $request->get_params();
     $parameters['id'] = filter_var($parameters['id'], FILTER_SANITIZE_NUMBER_INT, FILTER_NULL_ON_FAILURE);
+    $parameters['comp'] = htmlspecialchars($parameters['comp']);
     if (empty($parameters['id'])) {
+        $response = new WP_REST_Response(array(), 404);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+    if(empty($parameters['comp'])){
         $response = new WP_REST_Response(array(), 404);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
@@ -604,6 +715,15 @@ function bcl_content_embed(WP_REST_Request $request)
     if (function_exists('get_fields')) {
         $post = get_post($parameters['id']);
         $fields = get_fields($post->ID);
+        $user = get_user_by('login',$parameters['comp']);
+        if($user == false){
+            // User Not found
+            $response = new WP_REST_Response(array(), 404);
+            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+            return $response;
+        }
+        $user_settings = bcl_get_user_content_settings($user->ID, $post->ID);
+        $calculator_fields = array_merge($fields, $user_settings);
 
         if (!bcl_is_embed_domain_allowed($post->ID, $parameters['comp'] ?? '')) {
             $response = new WP_REST_Response(array(
@@ -616,7 +736,7 @@ function bcl_content_embed(WP_REST_Request $request)
 
         $response = new WP_REST_Response(array(
             "title" => $post->post_title,
-            "content" => bcl_calculator_code($post,$fields),
+            "content" => bcl_calculator_code($post,$calculator_fields),
         ), 200);
 
         // Set headers.
@@ -660,7 +780,6 @@ function bcl_content_item(WP_REST_Request $request)
     if (function_exists('get_fields')) {
         $post = get_post($parameters['id']);
         $fields = get_fields($post->ID);
-
         $user_id = get_current_user_id();
         $user_fields = get_fields('user_' . $user_id);
         $domains = (array) ($user_fields['domains']['allowed_domains'] ?? []);
@@ -1213,7 +1332,7 @@ function bcl_content_settings(WP_REST_Request $request)
 
         foreach ($settings as $field_name => $value) {
             $field_name = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $field_name);
-            if ($field_name === '') {
+            if ($field_name === '' || $field_name == "head_code" || $field_name == "body_code" || $field_name == "read_time") {
                 continue;
             }
             $value = is_string($value) ? sanitize_text_field($value) : $value;
@@ -1412,6 +1531,15 @@ function bcl_getpage(WP_REST_Request $request)
     return $response;
 }
 
+function bcl_aiprompt(WP_REST_Request $request)
+{
+    $data = array();
+
+    $response = new WP_REST_Response($data, 200);
+    $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+    return $response;
+}
+
 // Routes
 add_action('rest_api_init', function () {
     register_rest_route('bcl/v1', '/firm/stats', array(
@@ -1561,6 +1689,18 @@ add_action('rest_api_init', function () {
     register_rest_route('bcl/v1', '/page', array(
         'methods' => 'GET',
         'callback' => 'bcl_getpage',
+        'permission_callback' => '__return_true',
+        'args' => array(
+            'slug' => array(
+                'required'          => false,
+                'sanitize_callback' => 'sanitize_title',
+            ),
+        ),
+    ));
+
+    register_rest_route('bcl/v1', '/aiprompt', array(
+        'methods' => 'POST',
+        'callback' => 'bcl_aiprompt',
         'permission_callback' => '__return_true',
         'args' => array(
             'slug' => array(
