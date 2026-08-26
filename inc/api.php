@@ -282,6 +282,19 @@ function bcl_noAcfResponce()
     return $response;
 }
 
+function bcl_passwordreset(WP_REST_Request $request)
+{
+    //$parameters = $request->get_params();
+    //$data = json_decode($request->get_body(), true);
+}
+
+function bcl_resetpassword(WP_REST_Request $request)
+{
+    //$parameters = $request->get_params();
+    //$data = json_decode($request->get_body(), true);
+}
+
+
 function bcl_register(WP_REST_Request $request)
 {
     $data = json_decode($request->get_body(), true);
@@ -1675,6 +1688,18 @@ add_action('rest_api_init', function () {
     register_rest_route('bcl/v1', '/register', array(
         'methods' => 'POST',
         'callback' => 'bcl_register',
+        'permission_callback' => '__return_true'
+    ));
+
+    register_rest_route('bcl/v1', '/passwordreset', array(
+        'methods' => 'POST',
+        'callback' => 'bcl_passwordreset',
+        'permission_callback' => '__return_true'
+    ));
+
+    register_rest_route('bcl/v1', '/resetpassword', array(
+        'methods' => 'POST',
+        'callback' => 'bcl_resetpassword',
         'permission_callback' => '__return_true'
     ));
 

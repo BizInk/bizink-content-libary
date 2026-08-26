@@ -112,6 +112,11 @@ function register_topics_taxonomy(): void {
 add_action('init', __NAMESPACE__ . '\\register_topics_taxonomy');
 
 // Portal Email
+function bcl_password_email(string $message, string $key, string $user_login, WP_User $user_data){
+    return str_replace('portalcontent.bizinkonline.com/wp-login.php','portal.bizinkonline.com/resetpassword',$message);
+}
+add_filter('retrieve_password_message','bcl_password_email', 10,1);
+
 function bcl_mail_args(array $args){
     if(empty($args['headers'])){
         $args['headers'] = [];
@@ -127,15 +132,18 @@ function bcl_mail_args(array $args){
     }
     
 }
+add_filter('wp_mail', 'bcl_mail_args', 10,1);
+
 function bcl_from_name(string $from_name){
     return 'BCL Portal';
 }
+add_filter('wp_mail_from_name','bcl_from_name', 10,1);
+
 function bcl_from_email(string $from_email){
     return 'hello@bizinkonline.com';
 }
-add_filter('wp_mail_from_name','bcl_from_name', 10,1);
 add_filter('wp_mail_from','bcl_from_email', 10,1);
-add_filter('wp_mail', 'bcl_mail_args', 10,1);
+
 
 // Theme Updater
 require 'plugin-update-checker/plugin-update-checker.php';
