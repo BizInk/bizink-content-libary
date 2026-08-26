@@ -111,6 +111,32 @@ function register_topics_taxonomy(): void {
 }
 add_action('init', __NAMESPACE__ . '\\register_topics_taxonomy');
 
+// Portal Email
+function bcl_mail_args(array $args){
+    if(empty($args['headers'])){
+        $args['headers'] = [];
+    }
+    if(gettype($args['headers']) == 'string'){
+        $args['headers'] = [$args['headers']];
+    }
+    if(array_key_exists('Reply-To',$args['headers'])){
+        $args['headers']['Reply-To'] = 'support@bizinkonline.com';
+    }
+    else{
+        array_push($args['headers'],['Reply-To'=> 'support@bizinkonline.com']);
+    }
+    
+}
+function bcl_from_name(string $from_name){
+    return 'BCL Portal';
+}
+function bcl_from_email(string $from_email){
+    return 'hello@bizinkonline.com';
+}
+add_filter('wp_mail_from_name','bcl_from_name', 10,1);
+add_filter('wp_mail_from','bcl_from_email', 10,1);
+add_filter('wp_mail', 'bcl_mail_args', 10,1);
+
 // Theme Updater
 require 'plugin-update-checker/plugin-update-checker.php';
 use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
