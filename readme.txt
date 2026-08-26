@@ -3,7 +3,7 @@ Contributors: Jayden Major
 Tags: Bizink, Bizink Conetent Libary, BCL, Bizink Portal
 Requires at least: 6.0
 Tested up to: 7.0
-Stable tag: 0.1.9
+Stable tag: 0.1.8
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -16,13 +16,10 @@ Bizink Portal
 
 == Changelog ==
 
-= 0.1.9 =
+= 0.1.8 =
 * Labels Config
 * Email Header Update
-* Cacl Config Changes
-
-= 0.1.8 =
-* Content Config update
+* Cacl Content Config update
 
 = 0.1.7 =
 * API Settings Update
