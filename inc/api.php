@@ -285,13 +285,44 @@ function bcl_noAcfResponce()
 function bcl_passwordreset(WP_REST_Request $request)
 {
     //$parameters = $request->get_params();
-    //$data = json_decode($request->get_body(), true);
+    $data = json_decode($request->get_body(), true);
+    if(empty($data['email'])){
+        $response = new WP_REST_Response(array(
+            "message" => "Email parameter missing"
+        ), 400);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+    
+    $user = get_user_by( 'email', $data['email'] );
+    if(is_wp_error($user)){
+        $response = new WP_REST_Response(array(
+            "message" => "A password reset link has been sent to your email."
+        ), 200);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+    $reset_key = get_password_reset_key( $user );
+    $response = new WP_REST_Response(array(
+        "message" => "A password reset link has been sent to your email."
+    ), 200);
+    $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+    return $response;
 }
 
 function bcl_resetpassword(WP_REST_Request $request)
 {
     //$parameters = $request->get_params();
-    //$data = json_decode($request->get_body(), true);
+    $data = json_decode($request->get_body(), true);
+    if(empty($date)){
+        $response = new WP_REST_Response(array(
+            "message" => "Data Missing"
+        ), 400);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+
 }
 
 
@@ -352,7 +383,7 @@ function bcl_register(WP_REST_Request $request)
     $user_id = wp_create_user($username, $password, $email);
 
     if (is_wp_error($user_id)) {
-        $response = new WP_REST_Response(array("message" => $user_id->get_error_message()), 500);
+        $response = new WP_REST_Response(array("message" => $user_id->get_error_message()), 400);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
