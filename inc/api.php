@@ -284,7 +284,6 @@ function bcl_noAcfResponce()
 
 function bcl_passwordreset(WP_REST_Request $request)
 {
-    //$parameters = $request->get_params();
     $data = json_decode($request->get_body(), true);
     if(empty($data['email'])){
         $response = new WP_REST_Response(array(
@@ -293,16 +292,17 @@ function bcl_passwordreset(WP_REST_Request $request)
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
-    
-    $user = get_user_by( 'email', $data['email'] );
-    if(is_wp_error($user)){
+    try{
+        retrieve_password($data['email']);
+    }
+    catch (Exception $e) {
+        // Error
         $response = new WP_REST_Response(array(
-            "message" => "A password reset link has been sent to your email."
-        ), 200);
+        "message" => $e->getMessage()
+        ), 400);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
-    $reset_key = get_password_reset_key( $user );
     $response = new WP_REST_Response(array(
         "message" => "A password reset link has been sent to your email."
     ), 200);
@@ -314,15 +314,46 @@ function bcl_resetpassword(WP_REST_Request $request)
 {
     //$parameters = $request->get_params();
     $data = json_decode($request->get_body(), true);
-    if(empty($date)){
+    if(empty($data)){
         $response = new WP_REST_Response(array(
-            "message" => "Data Missing"
+            "message" => "Misssing Data Fields",
+            "fileds" => ['username','token','password','confirmPassword']
+        ), 400);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+    if( empty($data['username']) || empty($data['token']) || empty($data['password']) || empty($data['confirmPassword']) ){
+        $response = new WP_REST_Response(array(
+            "message" => "Misssing Data Fields",
+            "fileds" => ['username','token','password','confirmPassword']
+        ), 400);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+    $user = check_password_reset_key($data['token'],$data['username']);
+    if(is_wp_error($user)){
+        $response = new WP_REST_Response(array(
+            "message" => $check->get_error_message(),
+        ), 400);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+    
+    if($data['password'] != $data['confirmPassword']){
+        $response = new WP_REST_Response(array(
+            "message" => 'Error Password Missmatch',
         ), 400);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
 
-
+    reset_password( $user, $data['password'] );
+    
+    $response = new WP_REST_Response(array(
+        "message" => 'Success - Login with your new password',
+    ), 200);
+    $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+    return $response;
 }
 
 

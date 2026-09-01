@@ -111,10 +111,21 @@ function register_topics_taxonomy(): void {
 add_action('init', __NAMESPACE__ . '\\register_topics_taxonomy');
 
 // Portal Email
-function bcl_password_email(string $message, string $key, string $user_login, WP_User $user_data){
-    return str_replace('portalcontent.bizinkonline.com/wp-login.php','portal.bizinkonline.com/resetpassword',$message);
+function bcl_new_user_email($message,  $user, $blogname){
+
 }
-add_filter('retrieve_password_message','bcl_password_email', 10,1);
+// add_filter('wp_new_user_notification_email','bcl_new_user_email',10,3)
+
+function bcl_password_email(string $message, string $key, string $user_login, $user_data){
+    $mail = __( 'Someone has requested a password reset for the following account:', 'bcl_portal' ) . "\n";
+    $mail .= sprintf( __( 'Username: %s', 'bcl_portal' ), $user_login ) . "\n";
+    $mail .= __( 'If this was a mistake, just ignore this email and nothing will happen.', 'bcl_portal' ) . "\n\n";
+	$mail .= __( 'To reset your password, visit the following address:', 'bcl_portal' ) . "\n\n";
+	$mail .= 'https://portal.bizinkonline.com/resetpassword?action=rp&key='.$key.'&login='. rawurlencode( $user_login ) . "\n\n";
+
+    return $mail;
+}
+add_filter('retrieve_password_message','bcl_password_email', 10, 4);
 
 function bcl_mail_args(array $args){
     if(empty($args['headers'])){
@@ -131,17 +142,17 @@ function bcl_mail_args(array $args){
     }
     
 }
-add_filter('wp_mail', 'bcl_mail_args', 10,1);
+//add_filter('wp_mail', 'bcl_mail_args');
 
 function bcl_from_name(string $from_name){
     return 'BCL Portal';
 }
-add_filter('wp_mail_from_name','bcl_from_name', 10,1);
+add_filter('wp_mail_from_name','bcl_from_name');
 
 function bcl_from_email(string $from_email){
     return 'hello@bizinkonline.com';
 }
-add_filter('wp_mail_from','bcl_from_email', 10,1);
+add_filter('wp_mail_from','bcl_from_email');
 
 
 // Theme Updater
