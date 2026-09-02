@@ -8,6 +8,25 @@ function bcl_calculator_code(WP_POST $post, array $fields)
 {
 	$content = "";
 	ob_start();
+
+    if(!empty($fields['backgroundColor'])){
+        $fields['outer-background'] = $fields['calc-background'] = $fields['backgroundColor']; // backgroundColor
+    }
+    if(!empty($fields['tabColor'])){
+        $fields['tab-background'] = $fields['tabColor']; // tabColor
+    }
+    if(!empty($fields['sliderColor'])){
+        $fields['slider-thumb-color']  = $fields['sliderColor']; // sliderColor
+    }
+    if(!empty($fields['sliderBgColor'])){
+        $fields['slider-track-color']  = $fields['sliderBgColor']; // sliderBgColor
+    }
+    if(!empty($fields['headerColor'])){
+        $fields['disclaimer-heading-color'] = $fields['headerColor']; // headerColor
+    }
+    if(!empty($fields['textColor'])){
+        $fields['call-to-action-color'] = $fields['disclaimer-color'] = $fields['intro-font-color'] = $fields['textColor']; // textColor
+    }
 ?>
 	<!doctype html>
 	<html>
@@ -79,7 +98,7 @@ function bcl_calculator_code(WP_POST $post, array $fields)
 				--brand-output-color: <?php echo $fields['output-color'] ?? '#036'; ?> !important;
 				--brand-disclaimer-heading-color: <?php echo $fields['disclaimer-heading-color'] ?? '#000'; ?> !important;
 				--brand-disclaimer-color: <?php echo $fields['disclaimer-color'] ?? '#000'; ?> !important;
-				--brand-call-to-action-color: <?php echo $fields['call-to-action-color'] ?? '#fff'; ?> !important;
+				--brand-call-to-action-color: <?php echo $fields['call-to-action-color'] ?? '#000'; ?> !important;
 
 				/* buttons*/
 				--brand-button-background: <?php echo $fields['button-background'] ?? '#000'; ?> !important;
@@ -140,6 +159,10 @@ function bcl_calculator_code(WP_POST $post, array $fields)
 				--brand-tab-font-size: <?php echo $fields['tab-font-size'] ?? '1.1'; ?>rem !important;
 				--brand-tab-font-weight: <?php echo $fields['tab-font-weight'] ?? '600'; ?> !important;
 			}
+
+            * {
+                color: var(--brand-intro-font-color);
+            }
 		</style>
         <script>
             // brandContent.js
