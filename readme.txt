@@ -19,6 +19,7 @@ Bizink Portal
 = 0.1.9 =
 * Filter Email
 * Password Reset
+* Color Settings
 
 = 0.1.8 =
 * Labels Config

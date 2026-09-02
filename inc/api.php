@@ -25,7 +25,10 @@ function bcl_calculator_code(WP_POST $post, array $fields)
         $fields['disclaimer-heading-color'] = $fields['headerColor']; // headerColor
     }
     if(!empty($fields['textColor'])){
-        $fields['call-to-action-color'] = $fields['disclaimer-color'] = $fields['intro-font-color'] = $fields['textColor']; // textColor
+        $fields['input-color'] = $fields['results-summary-text-color'] = $fields['call-to-action-color'] = $fields['disclaimer-color'] = $fields['intro-font-color'] = $fields['textColor']; // textColor
+    }
+    if(!empty($fields['buttonColor'])){
+        $fields['button-grad-background'] = $fields['button-background'] = $fields['buttonColor']; //buttonColor
     }
 ?>
 	<!doctype html>
