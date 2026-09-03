@@ -683,6 +683,55 @@ function bcl_content(WP_REST_Request $request)
     return $response;
 }
 
+function bcl_content_regions(WP_REST_Request $request){
+    //$parameters = $request->get_params();
+
+    $term_query = new WP_Term_Query( array( 
+        'taxonomy' => 'region',
+        'orderby'                => 'name',
+        'order'                  => 'ASC',
+        'child_of'               => 0,
+        'parent' => 0,
+        'fields'                 => 'id=>name',
+        'hide_empty'             => true,
+    ) );
+
+    if(is_wp_error($term_query)){
+        $response = new WP_REST_Response($term_query->get_error_messages, 404);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    $response = new WP_REST_Response($term_query->terms ?? [], 200);
+    $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+    return $response;
+}
+
+function bcl_content_topics(WP_REST_Request $request){
+    // $parameters = $request->get_params();
+
+    $term_query = new WP_Term_Query( array( 
+        'taxonomy' => 'bcl_topic',
+        'orderby'                => 'name',
+        'order'                  => 'ASC',
+        'child_of'               => 0,
+        'parent' => 0,
+        'fields'                 => 'id=>name',
+        'hide_empty'             => true,
+    ) );
+
+    if(is_wp_error($term_query)){
+        $response = new WP_REST_Response($term_query->get_error_messages, 404);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    $response = new WP_REST_Response($term_query->terms ?? [], 200);
+    $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+    return $response;
+
+}
+
 function bcl_content_item_all(WP_REST_Request $request)
 {
     $parameters = $request->get_params();
@@ -735,7 +784,7 @@ function bcl_content_item_all(WP_REST_Request $request)
         $response->set_headers([
             'Cache-Control' => 'must-revalidate, no-cache, no-store, private',
             'x-wp-total' => $the_query->post_count,
-            'x-wp-totalpages' => $the_query->max_num_pages
+            'x-wp-totalpages' => $the_query->max_num_pages,
         ]);
 
         return $response;
@@ -1703,6 +1752,24 @@ add_action('rest_api_init', function () {
         'callback' => 'bcl_content_embed',
         'permission_callback' => '__return_true',
     ));
+
+    
+    register_rest_route('bcl/v1', '/bcl_regions', array(
+        'methods' => 'GET',
+        'callback' => 'bcl_content_regions',
+        'permission_callback' => function () {
+            return current_user_can('read');
+        },
+    ));
+
+    register_rest_route('bcl/v1', '/bcl_topics', array(
+        'methods' => 'GET',
+        'callback' => 'bcl_content_topics',
+        'permission_callback' => function () {
+            return current_user_can('read');
+        },
+    ));
+
     register_rest_route('bcl/v1', '/bcl_content_item', array(
         'methods' => 'GET',
         'callback' => 'bcl_content_item_all',

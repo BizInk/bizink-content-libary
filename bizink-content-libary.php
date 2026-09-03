@@ -68,7 +68,7 @@ function register_content_types(): void {
             'menu_postion'      => 5,
             'menu_icon'         => $meta['icon'],
             'supports'          => $slug == 'bcl_article' ? ['title', 'editor', 'excerpt', 'thumbnail', 'revisions']:['title', 'thumbnail', 'revisions'],
-            'taxonomies'        => ['bcl_topic'],
+            'taxonomies'        => ['bcl_topic','region'],
             'rewrite'           => ['slug' => str_replace('bcl_', '', $slug)],
             'capability_type'   => 'post',
         ]);

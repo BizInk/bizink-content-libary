@@ -20,6 +20,8 @@ Bizink Portal
 * Filter Email
 * Password Reset
 * Color Settings
+* Search Fixed
+* Topics
 
 = 0.1.8 =
 * Labels Config
