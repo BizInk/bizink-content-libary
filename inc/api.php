@@ -692,7 +692,7 @@ function bcl_content_regions(WP_REST_Request $request){
         'order'                  => 'ASC',
         'child_of'               => 0,
         'parent' => 0,
-        'fields'                 => 'id=>name',
+        'fields'                 => 'all',
         'hide_empty'             => true,
     ) );
 
@@ -716,7 +716,7 @@ function bcl_content_topics(WP_REST_Request $request){
         'order'                  => 'ASC',
         'child_of'               => 0,
         'parent' => 0,
-        'fields'                 => 'id=>name',
+        'fields'                 => 'all',
         'hide_empty'             => true,
     ) );
 
