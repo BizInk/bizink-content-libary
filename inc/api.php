@@ -686,8 +686,6 @@ function bcl_content(WP_REST_Request $request)
 function bcl_content_item_all(WP_REST_Request $request)
 {
     $parameters = $request->get_params();
-    //$parameters['featured'] = filter_var($parameters['id'], FILTER_VALIDATE_BOOLEAN);
-    //$parameters['search'] = htmlspecialchars($parameters['search']);
 
     $args = array(
         'posts_per_page' => empty($parameters['per_page']) ? 20 : $parameters['per_page'],
@@ -701,9 +699,10 @@ function bcl_content_item_all(WP_REST_Request $request)
         $args['order'] = 'DESC';
     }
     if (!empty($parameters['search'])) {
-        $arg['s'] = $parameters['search'];
+        $args['s'] = $parameters['search'];
         $args['orderby'] = 'relevance';
     }
+
 
     if (function_exists('get_fields')) {
         $the_query = new WP_Query($args);
