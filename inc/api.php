@@ -1648,6 +1648,8 @@ function bcl_getpage(WP_REST_Request $request)
         return $response;
     }
 
+    setup_postdata($post);
+    
     $data = array(
         "id"             => $post->ID,
         "title"          => $post->post_title,
@@ -1660,19 +1662,15 @@ function bcl_getpage(WP_REST_Request $request)
     );
 
     $elementor_edit_mode = get_post_meta($post->ID, '_elementor_edit_mode', true);
-    $elementor_data      = get_post_meta($post->ID, '_elementor_data', true);
+    $elementor_data      = json_decode(get_post_meta($post->ID, '_elementor_data', true));
 
     if ($elementor_edit_mode === 'builder' && !empty($elementor_data)) {
         $data['built_with_elementor'] = true;
         if (class_exists("\\Elementor\\Plugin")) {
             $pluginElementor = \Elementor\Plugin::instance();
-            $data['content'] = $pluginElementor->frontend->get_builder_content($post->ID);
+            $data['content'] = $pluginElementor->frontend->get_builder_content_for_display($post->ID,true);
+            $data['settings'] = $elementor_data;
         }
-        $data['elementor'] = array(
-            "version"              => get_post_meta($post->ID, '_elementor_version', true),
-            "page_settings"        => get_post_meta($post->ID, '_elementor_page_settings', true),
-            "elementor_css"        => get_post_meta($post->ID,'_elementor_css',true)
-        );
     }
 
     $response = new WP_REST_Response($data, 200);
