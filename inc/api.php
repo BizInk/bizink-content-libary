@@ -4,6 +4,21 @@ defined('ABSPATH') || exit;
 
 ini_set('max_execution_time', '300');
 
+function bcl_filter_domains($d){
+    if(empty($d) && empty($d['url'])){
+        return false;
+    }
+    return $d['url'] ?? "";
+}
+
+function bcl_getuser_domains($user_id){
+    if(empty($user_id) || function_exists('get_fields') == false){
+        return [];
+    }
+    $user_fields  = get_fields('user_' . $user_id);
+    return array_map('bcl_filter_domains',$user_fields['domains']);
+}
+
 function bcl_calculator_code(WP_POST $post, array $fields)
 {
 	$content = "";
@@ -797,10 +812,11 @@ function bcl_request_origin_host()
 {
     $origin = $_SERVER['HTTP_ORIGIN'] ?? $_SERVER['HTTP_REFERER'] ?? '';
     $host = parse_url($origin, PHP_URL_HOST);
+    $host = str_replace('www.','',$host);
     return $host ? strtolower($host) : '';
 }
 
-function bcl_is_embed_domain_allowed($content_id, $username)
+function bcl_is_embed_domain_allowed($username)
 {
     $username = sanitize_user($username, true);
     if (empty($username) || !function_exists('get_fields')) {
@@ -812,11 +828,8 @@ function bcl_is_embed_domain_allowed($content_id, $username)
         return true;
     }
 
-    $fields  = get_fields('user_' . $user->ID);
-    $domains = (array) ($fields['domains']['allowed_domains'] ?? []);
-    $domains = array_filter($domains, function ($row) use ($content_id) {
-        return absint($row['content_id'] ?? 0) === (int) $content_id;
-    });
+    
+    $domains = bcl_getuser_domains($user->ID);
 
     // No domains registered for this content -> unrestricted.
     if (empty($domains)) {
@@ -830,16 +843,8 @@ function bcl_is_embed_domain_allowed($content_id, $username)
         return true;
     }
 
-    foreach ($domains as $row) {
-        $allowed = strtolower(trim($row['url'] ?? ''));
-        $allowed = preg_replace('#^https?://#', '', $allowed);
-        $allowed = rtrim($allowed, '/');
-        if ($allowed === '') {
-            continue;
-        }
-        if ($host === $allowed || $host === 'www.' . $allowed || ('www.' . $host) === $allowed) {
-            return true;
-        }
+    if(in_array($host,$domains)){
+        return true;
     }
 
     return false;
@@ -874,10 +879,44 @@ function bcl_content_embed(WP_REST_Request $request)
         $user_settings = bcl_get_user_content_settings($user->ID, $post->ID);
         $calculator_fields = array_merge($fields, $user_settings);
 
-        if (!bcl_is_embed_domain_allowed($post->ID, $parameters['comp'] ?? '')) {
+        if (!bcl_is_embed_domain_allowed($parameters['comp'] ?? '')) {
+            $content = "";
+	        ob_start();
+            ?>
+            <!doctype html>
+            <html>
+                <head>
+                    <meta charset="utf-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <title><?php echo $post->post_title; ?></title>
+                    <script async src="https://portal.bizinkonline.com/resizer.js"></script>
+                    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+                    <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap" />
+                    <link rel="stylesheet" type="text/css" href="https://smartbizcalcs.com/css/style.css" />
+                    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+                    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+                </head>
+                <body>
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Domain Not Allowed</h5>
+                            <p>Caculator not allowed on this website.</p>
+                        </div>
+                    </div>
+                    <script>
+                        window.iframeResizer = {
+                            license: "GPLv3"
+                        }
+                    </script>
+                </body>
+               </html>
+            <?php
+            $content = ob_get_contents();
+	        ob_end_clean();
+
             $response = new WP_REST_Response(array(
                 "title" => $post->post_title,
-                "content" => "",
+                "content" => $content,
             ), 200);
             $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
             return $response;
@@ -930,8 +969,7 @@ function bcl_content_item(WP_REST_Request $request)
         $post = get_post($parameters['id']);
         $fields = get_fields($post->ID);
         $user_id = get_current_user_id();
-        $user_fields = get_fields('user_' . $user_id);
-        $domains = (array) ($user_fields['domains']['allowed_domains'] ?? []);
+        $domains = bcl_getuser_domains($user_id);
 
         // Per-user, per-content overrides (not managed via ACF; stored as user meta
         // keyed 'content_settings_{content_id}_{field_name}'). Anything not set here
@@ -1510,13 +1548,7 @@ function bcl_content_allowed_domains(WP_REST_Request $request)
         return $response;
     }
 
-    $parameters = $request->get_params();
-    $content_id  = absint($parameters['id'] ?? 0);
-    if (empty($content_id)) {
-        $response = new WP_REST_Response(array("message" => "Invalid content ID"), 400);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
-    }
+    $domains = bcl_getuser_domains($user_id);
 
     if (!function_exists('get_fields') || !function_exists('update_field')) {
         return bcl_noAcfResponce();
@@ -1526,87 +1558,56 @@ function bcl_content_allowed_domains(WP_REST_Request $request)
 
     // GET — return all allowed domains for this post ID across all users
     if ($method === 'GET') {
-        global $wpdb;
-
-        // ACF stores repeater rows (inside the `domains` group) as:
-        //   domains_allowed_domains_{index}_content_id  => post ID
-        //   domains_allowed_domains_{index}_url          => domain URL
-        // Query every usermeta row where content_id equals the requested post ID.
-        $id_rows = $wpdb->get_results($wpdb->prepare(
-            "SELECT user_id, meta_key, meta_value
-               FROM {$wpdb->usermeta}
-              WHERE meta_key LIKE %s
-                AND meta_value = %s",
-            'domains\_allowed\_domains\_%\_content\_id',
-            (string) $content_id
-        ));
-
-        $urls = [];
-        foreach ($id_rows as $row) {
-            // Derive the sibling URL key, e.g. domains_allowed_domains_2_content_id
-            // → domains_allowed_domains_2_url
-            $url_key = preg_replace('/_content_id$/', '_url', $row->meta_key);
-            $url     = get_user_meta($row->user_id, $url_key, true);
-            if (!empty($url)) {
-                $urls[] = array(
-                    'user_id'    => (int) $row->user_id,
-                    'content_id' => $content_id,
-                    'url'        => $url,
-                );
-            }
-        }
-
         $response = new WP_REST_Response(array(
-            "content_id"      => $content_id,
-            "allowed_domains" => $urls,
+            "allowed_domains" => $domains,
         ), 200);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
+    else if($method == 'DELETE'){
+        $data = json_decode($request->get_body(), true);
+        $url = str_replace("https://","",str_replace("http://","",filter_var($data['domain'] ?? '', FILTER_SANITIZE_URL)));
 
-    // POST — add a new url + content_id pair if not already present
-    $data = json_decode($request->get_body(), true);
-    $url  = filter_var($data['domain'] ?? '', FILTER_SANITIZE_URL);
-
-    $url = str_replace("https://","",$url);
-    $url = str_replace("http://","",$url);
-
-
-    if (empty($url)) {
-        $response = new WP_REST_Response(array("message" => "URL is required"), 400);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
-    }
-
-    $fields        = get_fields('user_' . $user_id);
-    $existing_rows = (array) ($fields['domains']['allowed_domains'] ?? []);
-
-    // Check for a duplicate — same content_id AND url
-    foreach ($existing_rows as $row) {
-        if (absint($row['content_id']) === $content_id && $row['url'] === $url) {
-            $response = new WP_REST_Response(array(
-                "message"         => "Domain already exists",
-                "allowed_domains" => $existing_rows,
-            ), 200);
+        if (empty($url)) {
+            $response = new WP_REST_Response(array("message" => "URL is required"), 400);
             $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
             return $response;
         }
+
+        $key = array_search($url,$domains);
+        if($key){
+            array_splice($domains,$key,1);
+        }
+        update_field('field_6aa20c2d34ed6', $domains, 'user_' . $user_id);
+
+        $response = new WP_REST_Response(array(
+            "message"         => "Domain deleted successfully",
+            "allowed_domains" => $domains,
+        ), 201);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
     }
+    else{
+        $data = json_decode($request->get_body(), true);
+        $url = str_replace("https://","",str_replace("http://","",filter_var($data['domain'] ?? '', FILTER_SANITIZE_URL)));
 
-    // Append and persist using the repeater's field key so ACF resolves it correctly
-    $existing_rows[] = array(
-        'content_id' => $content_id,
-        'url'        => $url,
-    );
-    // domains_allowed_domains
-    update_field('field_6a138bcb79287', $existing_rows, 'user_' . $user_id);
+        if (empty($url)) {
+            $response = new WP_REST_Response(array("message" => "URL is required"), 400);
+            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+            return $response;
+        }
 
-    $response = new WP_REST_Response(array(
-        "message"         => "Domain added successfully",
-        "allowed_domains" => $existing_rows,
-    ), 201);
-    $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-    return $response;
+        array_push($domains,$url);
+        update_field('field_6aa20c2d34ed6', $domains, 'user_' . $user_id);
+
+        $response = new WP_REST_Response(array(
+            "message"         => "Domain added successfully",
+            "allowed_domains" => $domains,
+        ), 201);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+    
 }
 
 function bcl_admin_branding_queue(WP_REST_Request $request)
@@ -1802,7 +1803,7 @@ add_action('rest_api_init', function () {
         },
     ));
     register_rest_route('bcl/v1', '/content/(?P<id>\d+)/allowed-domains', array(
-        'methods' => array('GET', 'POST', 'DELETE'),
+        'methods' => array('GET', 'POST', "DELETE", 'PUT'),
         'callback' => 'bcl_content_allowed_domains',
         'permission_callback' => function () {
             return current_user_can('read');
