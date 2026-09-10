@@ -5,18 +5,48 @@ defined('ABSPATH') || exit;
 ini_set('max_execution_time', '300');
 
 function bcl_filter_domains($d){
-    if(empty($d) && empty($d['url'])){
-        return false;
+    // Rows come from the `domains` ACF repeater as ['url' => '...'], but older
+    // / API-written data may be a plain string. Handle both.
+    $url = is_array($d) ? ($d['url'] ?? '') : (is_string($d) ? $d : '');
+    return bcl_normalize_domain($url);
+}
+
+function bcl_normalize_domain($url){
+    if (!is_string($url)) {
+        return '';
     }
-    return $d['url'] ?? "";
+    $url = strtolower(trim($url));
+    $url = preg_replace('#^https?://#', '', $url);
+    $url = preg_replace('#^www\.#', '', $url);
+    return rtrim($url, '/');
 }
 
 function bcl_getuser_domains($user_id){
     if(empty($user_id) || function_exists('get_fields') == false){
         return [];
     }
-    $user_fields  = get_fields('user_' . $user_id);
-    return array_map('bcl_filter_domains',$user_fields['domains']);
+    $user_fields = get_fields('user_' . $user_id);
+    // An empty ACF repeater returns false; guard against every non-array shape
+    // so array_map() below can't fatal (HTTP 500).
+    $rows = (is_array($user_fields) && isset($user_fields['domains']) && is_array($user_fields['domains']))
+        ? $user_fields['domains']
+        : [];
+
+    $domains = array_map('bcl_filter_domains', $rows);
+
+    return array_values(array_unique(array_filter($domains, 'strlen')));
+}
+
+function bcl_save_user_domains($user_id, array $domains){
+    if(empty($user_id) || function_exists('update_field') == false){
+        return [];
+    }
+    $domains = array_values(array_unique(array_filter(array_map('bcl_normalize_domain', $domains), 'strlen')));
+    // `domains` is an ACF repeater with a single `url` sub-field, so it must be
+    // written as an array of rows, not a flat list of strings.
+    $rows = array_map(function($url){ return array('url' => $url); }, $domains);
+    update_field('field_6aa20c2d34ed6', $rows, 'user_' . $user_id);
+    return $domains;
 }
 
 function bcl_calculator_code(WP_POST $post, array $fields)
@@ -812,8 +842,7 @@ function bcl_request_origin_host()
 {
     $origin = $_SERVER['HTTP_ORIGIN'] ?? $_SERVER['HTTP_REFERER'] ?? '';
     $host = parse_url($origin, PHP_URL_HOST);
-    $host = str_replace('www.','',$host);
-    return $host ? strtolower($host) : '';
+    return $host ? bcl_normalize_domain($host) : '';
 }
 
 function bcl_is_embed_domain_allowed($username)
@@ -828,7 +857,6 @@ function bcl_is_embed_domain_allowed($username)
         return true;
     }
 
-    
     $domains = bcl_getuser_domains($user->ID);
 
     // No domains registered for this content -> unrestricted.
@@ -868,7 +896,15 @@ function bcl_content_embed(WP_REST_Request $request)
 
     if (function_exists('get_fields')) {
         $post = get_post($parameters['id']);
+        if (!$post) {
+            $response = new WP_REST_Response(array(), 404);
+            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+            return $response;
+        }
+        // get_fields() returns false when the post has no ACF data; keep it an
+        // array so array_merge() below can't fatal (HTTP 500).
         $fields = get_fields($post->ID);
+        $fields = is_array($fields) ? $fields : array();
         $user = get_user_by('login',$parameters['comp']);
         if($user == false){
             // User Not found
@@ -967,7 +1003,15 @@ function bcl_content_item(WP_REST_Request $request)
     }
     if (function_exists('get_fields')) {
         $post = get_post($parameters['id']);
+        if (!$post) {
+            $response = new WP_REST_Response(array(), 404);
+            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+            return $response;
+        }
+        // get_fields() returns false when the post has no ACF data; keep it an
+        // array so array_merge() below can't fatal (HTTP 500).
         $fields = get_fields($post->ID);
+        $fields = is_array($fields) ? $fields : array();
         $user_id = get_current_user_id();
         $domains = bcl_getuser_domains($user_id);
 
@@ -1566,7 +1610,7 @@ function bcl_content_allowed_domains(WP_REST_Request $request)
     }
     else if($method == 'DELETE'){
         $data = json_decode($request->get_body(), true);
-        $url = str_replace("https://","",str_replace("http://","",filter_var($data['domain'] ?? '', FILTER_SANITIZE_URL)));
+        $url = bcl_normalize_domain(filter_var($data['domain'] ?? '', FILTER_SANITIZE_URL));
 
         if (empty($url)) {
             $response = new WP_REST_Response(array("message" => "URL is required"), 400);
@@ -1574,22 +1618,22 @@ function bcl_content_allowed_domains(WP_REST_Request $request)
             return $response;
         }
 
-        $key = array_search($url,$domains);
-        if($key){
-            array_splice($domains,$key,1);
+        $key = array_search($url, $domains, true);
+        if($key !== false){
+            array_splice($domains, $key, 1);
         }
-        update_field('field_6aa20c2d34ed6', $domains, 'user_' . $user_id);
+        $domains = bcl_save_user_domains($user_id, $domains);
 
         $response = new WP_REST_Response(array(
             "message"         => "Domain deleted successfully",
             "allowed_domains" => $domains,
-        ), 201);
+        ), 200);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
     else{
         $data = json_decode($request->get_body(), true);
-        $url = str_replace("https://","",str_replace("http://","",filter_var($data['domain'] ?? '', FILTER_SANITIZE_URL)));
+        $url = bcl_normalize_domain(filter_var($data['domain'] ?? '', FILTER_SANITIZE_URL));
 
         if (empty($url)) {
             $response = new WP_REST_Response(array("message" => "URL is required"), 400);
@@ -1597,8 +1641,8 @@ function bcl_content_allowed_domains(WP_REST_Request $request)
             return $response;
         }
 
-        array_push($domains,$url);
-        update_field('field_6aa20c2d34ed6', $domains, 'user_' . $user_id);
+        $domains[] = $url;
+        $domains = bcl_save_user_domains($user_id, $domains);
 
         $response = new WP_REST_Response(array(
             "message"         => "Domain added successfully",
@@ -1751,8 +1795,6 @@ add_action('rest_api_init', function () {
         'callback' => 'bcl_content_embed',
         'permission_callback' => '__return_true',
     ));
-
-    
     register_rest_route('bcl/v1', '/bcl_regions', array(
         'methods' => 'GET',
         'callback' => 'bcl_content_regions',
@@ -1760,7 +1802,6 @@ add_action('rest_api_init', function () {
             return current_user_can('read');
         },
     ));
-
     register_rest_route('bcl/v1', '/bcl_topics', array(
         'methods' => 'GET',
         'callback' => 'bcl_content_topics',
@@ -1768,7 +1809,6 @@ add_action('rest_api_init', function () {
             return current_user_can('read');
         },
     ));
-
     register_rest_route('bcl/v1', '/bcl_content_item', array(
         'methods' => 'GET',
         'callback' => 'bcl_content_item_all',
