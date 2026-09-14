@@ -796,7 +796,17 @@ function bcl_content_item_all(WP_REST_Request $request)
         $args['s'] = $parameters['search'];
         $args['orderby'] = 'relevance';
     }
-
+    if(!empty($parameters['topics'])){
+        //tax_query 'relation' => 'OR',
+        $args['tax_query'] = array(
+            array(
+                'taxonomy' => 'bcl_topic',
+                'field' => 'slug',
+                'terms' => $parameters['topics'],
+                'operator' => 'IN'
+            )
+        );
+    }
 
     if (function_exists('get_fields')) {
         $the_query = new WP_Query($args);
