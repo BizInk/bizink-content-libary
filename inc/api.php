@@ -841,8 +841,17 @@ function bcl_content_item_all(WP_REST_Request $request)
                         "content_type" => $post->post_type
                     )
                 );
-                if ($fields['read_time']) {
-                    $data['read_time'] = $fields['read_time'];
+                if (isset($fields['read_time'])) {
+                    $data['meta']['read_time'] = $fields['read_time'];
+                }
+                else{
+                    $data['meta']['read_time'] = 0;
+                }
+                if(isset($fields['download_links'])){
+                    $data['meta']['download_links'] = $fields['download_links'];
+                }
+                else{
+                    $data['meta']['download_links'] = [];
                 }
                 array_push($postData, $d);
             }
@@ -1063,7 +1072,16 @@ function bcl_content_item(WP_REST_Request $request)
             }
         }
         if (isset($fields['read_time'])) {
-            $data['read_time'] = $fields['read_time'];
+            $data['meta']['read_time'] = $fields['read_time'];
+        }
+        else{
+            $data['meta']['read_time'] = 0;
+        }
+        if(isset($fields['download_links'])){
+            $data['meta']['download_links'] = $fields['download_links'];
+        }
+        else{
+            $data['meta']['download_links'] = [];
         }
         if (isset($fields['file_download'])) {
             $data['meta']['file_download'] = $fields['file_download'];
@@ -1588,7 +1606,7 @@ function bcl_content_settings(WP_REST_Request $request)
 
         foreach ($settings as $field_name => $value) {
             $field_name = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $field_name);
-            if ($field_name === '' || $field_name == "head_code" || $field_name == "body_code" || $field_name == "read_time") {
+            if ($field_name === '' || $field_name == "head_code" || $field_name == "body_code" || $field_name == "read_time" || $field_name == 'download_links') {
                 continue;
             }
             $value = is_string($value) ? sanitize_text_field($value) : $value;
