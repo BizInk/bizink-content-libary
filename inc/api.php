@@ -213,6 +213,8 @@ function bcl_calculator_code(WP_POST $post, array $fields)
             }
 		</style>
         <script>
+            
+
             // brandContent.js
 
             const brandContent = {
@@ -546,6 +548,18 @@ function bcl_subscribe(WP_REST_Request $request)
 
     if (!function_exists('pmpro_getLevel') || !class_exists('MemberOrder')) {
         $response = new WP_REST_Response(array("message" => "Paid Memberships Pro not active"), 500);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    // This endpoint charges the PaymentMethod directly (PMPro's "onsite" Stripe flow).
+    // When the site is set to Stripe Checkout instead, MemberOrder::process() redirects
+    // and exits rather than returning, which would kill this REST request. Bail out with
+    // a clear error instead of letting that happen; use /bcl/v1/checkout-session there.
+    if (class_exists('PMProGateway_stripe') && PMProGateway_stripe::using_stripe_checkout()) {
+        $response = new WP_REST_Response(array(
+            "message" => "This site is configured for Stripe Checkout; use the checkout session endpoint instead of /bcl/v1/subscribe"
+        ), 400);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
@@ -1504,6 +1518,7 @@ function bcl_analytics(WP_REST_Request $request)
         "content_id"      => $content_id,
         "total_events"    => $total_events,
         "events"          => $totals,
+        "caculations"      => $totals && $totals['caculate'] !== null ? $totals['caculate'] : 0,
         "views"            => $totals && $totals['view'] !== null ? $totals['view'] : 0,
         "total_engagement" => $engagement && $engagement->total !== null ? round((float) $engagement->total, 2) : 0,
         "avg_engagement"   => $engagement && $engagement->average !== null ? round((float) $engagement->average, 2) : 0,

@@ -52,6 +52,7 @@ function register_content_types(): void {
         'bcl_tool'       => [ 'singular' => 'Interactive tool','plural'=> 'Interactive tools','icon' => 'dashicons-admin-tools' ],
         'bcl_pdf'        => [ 'singular' => 'PDF template',   'plural' => 'PDF templates',    'icon' => 'dashicons-pdf' ],
         'bcl_excel'      => [ 'singular' => 'Excel template', 'plural' => 'Excel templates',  'icon' => 'dashicons-media-spreadsheet' ],
+        'bcl_request'    => [ 'singular' => 'Custom Request', 'plural' => 'Custom Requests',  'icon' => 'dashicons-image-rotate-right' ]
     ];
 
     foreach ($types as $slug => $meta) {
@@ -67,8 +68,8 @@ function register_content_types(): void {
             'has_archive'       => false,
             'menu_postion'      => 5,
             'menu_icon'         => $meta['icon'],
-            'supports'          => $slug == 'bcl_article' ? ['title', 'editor', 'excerpt', 'thumbnail', 'revisions']:['title', 'thumbnail', 'revisions'],
-            'taxonomies'        => ['bcl_topic','region'],
+            'supports'          => ($slug == 'bcl_article' || $slug == 'bcl_ebook' || $slug == 'bcl_pdf') ? ['title', 'editor', 'excerpt', 'thumbnail', 'revisions']:['title', 'thumbnail', 'revisions'],
+            'taxonomies'        => $slug == 'bcl_request' ? ['bcl_status']:['bcl_topic','region'],
             'rewrite'           => ['slug' => str_replace('bcl_', '', $slug)],
             'capability_type'   => 'post',
         ]);
@@ -80,6 +81,20 @@ add_action('init', __NAMESPACE__ . '\\register_content_types');
  * Shared topic taxonomy used across all BCL content types.
  */
 function register_topics_taxonomy(): void {
+    register_taxonomy('bcl_status', array_keys([
+        'bcl_request' => 1, 'bcl_article' => 0, 'bcl_ebook' => 0, 'bcl_calculator' => 0,
+        'bcl_tool' => 0, 'bcl_pdf' => 0, 'bcl_excel' => 0, 
+    ]), [
+        'labels'            => [
+            'name'          => 'Status',
+            'singular_name' => 'Status',
+        ],
+        'public'            => true,
+        'show_in_rest'      => true,
+        'hierarchical'      => false,
+        'rewrite'           => ['slug' => 'status'],
+    ]);
+
     register_taxonomy('bcl_topic', array_keys([
         'bcl_article' => 1, 'bcl_ebook' => 1, 'bcl_calculator' => 1,
         'bcl_tool' => 1, 'bcl_pdf' => 1, 'bcl_excel' => 1,
@@ -104,7 +119,7 @@ function register_topics_taxonomy(): void {
         ],
         'public'            => true,
         'show_in_rest'      => true,
-        'hierarchical'      => true,
+        'hierarchical'      => false,
         'rewrite'           => ['slug' => 'region'],
     ]);
 }

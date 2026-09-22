@@ -22,6 +22,7 @@ Bizink Portal
 * Color Settings
 * Search Fixed
 * Topics
+* Content Requests
 
 = 0.1.8 =
 * Labels Config
