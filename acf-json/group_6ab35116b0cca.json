@@ -20,6 +20,7 @@
                 "pending": "Pending",
                 "processing": "Processing",
                 "done": "Done",
+                "canceled": "Canceled",
                 "clientResponse": "Client Response",
                 "adminResponse": "Admin Response"
             },
@@ -39,7 +40,7 @@
             "label": "Content",
             "name": "content_item_id",
             "aria-label": "",
-            "type": "relationship",
+            "type": "post_object",
             "instructions": "",
             "required": 0,
             "conditional_logic": 0,
@@ -49,28 +50,21 @@
                 "id": ""
             },
             "post_type": [
-                "elementor_library",
-                "bcl_pdf",
+                "bcl_article",
                 "bcl_excel",
+                "bcl_pdf",
                 "bcl_tool",
                 "bcl_ebook",
-                "bcl_article"
+                "elementor_library"
             ],
-            "post_status": [
-                "publish"
-            ],
+            "post_status": "",
             "taxonomy": "",
-            "filters": [
-                "search",
-                "post_type",
-                "taxonomy"
-            ],
-            "return_format": "id",
-            "min": "",
-            "max": "",
+            "return_format": "object",
+            "multiple": 0,
+            "allow_null": 0,
             "allow_in_bindings": 0,
-            "elements": "",
             "bidirectional": 0,
+            "ui": 1,
             "bidirectional_target": []
         },
         {
@@ -185,5 +179,5 @@
     "display_title": "",
     "allow_ai_access": false,
     "ai_description": "",
-    "modified": 1790139099
+    "modified": 1790148472
 }

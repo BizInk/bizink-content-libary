@@ -1653,6 +1653,17 @@ function bcl_reshape_uploaded_files(array $files): array
     return $reshaped;
 }
 
+function bcl_branding_request_content_id($content_item_id)
+{
+    if ($content_item_id instanceof WP_Post) {
+        return $content_item_id->ID;
+    }
+    if (is_numeric($content_item_id)) {
+        return (int) $content_item_id;
+    }
+    return null;
+}
+
 function bcl_branding_request(WP_REST_Request $request)
 {
     $method = $request->get_method();
@@ -1691,7 +1702,7 @@ function bcl_branding_request(WP_REST_Request $request)
                     "id"              => $post->ID,
                     "title"           => $post->post_title,
                     "status"          => $fields['status'] ?? '',
-                    "content_item_id" => $fields['content_item_id'] ?? array(),
+                    "content_item_id" => bcl_branding_request_content_id($fields['content_item_id'] ?? null),
                     "notes"           => $fields['notes'] ?? '',
                     "images"          => $fields['images'] ?? array(),
                     "download_url"    => $fields['download_url'] ?? '',
@@ -1762,7 +1773,7 @@ function bcl_branding_request(WP_REST_Request $request)
             }
         }
 
-        update_field('content_item_id', array($content_item_id), $post_id);
+        update_field('content_item_id', $content_item_id, $post_id);
         update_field('notes', $request_note, $post_id);
         update_field('images', $images, $post_id);
         update_field('status', 'pending', $post_id);
@@ -1774,8 +1785,118 @@ function bcl_branding_request(WP_REST_Request $request)
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
+}
 
-    $response = new WP_REST_Response(array("message" => "Invalid request"), 400);
+function bcl_branding_request_update(WP_REST_Request $request)
+{
+    $user_id = get_current_user_id();
+    if (!$user_id) {
+        $response = new WP_REST_Response(array("message" => "User Not Found"), 404);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    if (!function_exists('get_fields') || !function_exists('update_field')) {
+        return bcl_noAcfResponce();
+    }
+
+    $request_id = absint($request->get_param('id'));
+    $post = $request_id ? get_post($request_id) : null;
+
+    if (!$post || $post->post_type !== 'bcl_request') {
+        $response = new WP_REST_Response(array("message" => "Branding request not found"), 404);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    // Only the author of the request may view or update it.
+    if ((int) $post->post_author !== $user_id) {
+        $response = new WP_REST_Response(array("message" => "You do not have permission to view this request"), 403);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    if ($request->get_method() === 'GET') {
+        $fields = get_fields($post->ID);
+        $response = new WP_REST_Response(array(
+            "id"              => $post->ID,
+            "title"           => $post->post_title,
+            "status"          => $fields['status'] ?? '',
+            "content_item_id" => bcl_branding_request_content_id($fields['content_item_id'] ?? null),
+            "notes"           => $fields['notes'] ?? '',
+            "images"          => $fields['images'] ?? array(),
+            "download_url"    => $fields['download_url'] ?? '',
+            "created_date"    => $post->post_date,
+            "modified_date"   => $post->post_modified,
+        ), 200);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    $params  = $request->get_params();
+    $updated = false;
+
+    if (isset($params['request_note'])) {
+        update_field('notes', sanitize_textarea_field($params['request_note']), $post->ID);
+        $updated = true;
+    }
+
+    if (isset($params['status'])) {
+        $current_status = get_field('status', $post->ID);
+        // Clients may only cancel their own request, and only before it has been completed.
+        if ($params['status'] !== 'canceled' || in_array($current_status, array('done', 'canceled'), true)) {
+            $response = new WP_REST_Response(array("message" => "Invalid status"), 400);
+            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+            return $response;
+        }
+        update_field('status', 'canceled', $post->ID);
+        $updated = true;
+    }
+
+    $files = $request->get_file_params();
+    $attachments = bcl_reshape_uploaded_files($files['attachments'] ?? array());
+    if (!empty($attachments)) {
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        require_once ABSPATH . 'wp-admin/includes/image.php';
+        require_once ABSPATH . 'wp-admin/includes/media.php';
+
+        $images = (array) get_field('images', $post->ID);
+        foreach ($attachments as $file) {
+            if (empty($file['tmp_name']) || !empty($file['error'])) {
+                continue;
+            }
+            $attachment_id = media_handle_sideload($file, $post->ID);
+            if (!is_wp_error($attachment_id)) {
+                $images[] = array('image' => $attachment_id);
+            }
+        }
+        update_field('images', $images, $post->ID);
+        $updated = true;
+    }
+
+    if (!$updated) {
+        $response = new WP_REST_Response(array("message" => "No fields provided"), 400);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    wp_update_post(array('ID' => $post->ID));
+
+    $post    = get_post($post->ID);
+    $fields  = get_fields($post->ID);
+
+    $response = new WP_REST_Response(array(
+        "message"         => "Branding request updated successfully",
+        "id"              => $post->ID,
+        "title"           => $post->post_title,
+        "status"          => $fields['status'] ?? '',
+        "content_item_id" => bcl_branding_request_content_id($fields['content_item_id'] ?? null),
+        "notes"           => $fields['notes'] ?? '',
+        "images"          => $fields['images'] ?? array(),
+        "download_url"    => $fields['download_url'] ?? '',
+        "created_date"    => $post->post_date,
+        "modified_date"   => $post->post_modified,
+    ), 200);
     $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
     return $response;
 }
@@ -2135,6 +2256,14 @@ add_action('rest_api_init', function () {
     register_rest_route('bcl/v1', '/branding-requests', array(
         'methods' => ['GET', 'POST'],
         'callback' => 'bcl_branding_request',
+        'permission_callback' => function () {
+            return current_user_can('read');
+        },
+    ));
+
+    register_rest_route('bcl/v1', '/branding-requests/(?P<id>\d+)', array(
+        'methods' => ['GET', 'PATCH', 'PUT'],
+        'callback' => 'bcl_branding_request_update',
         'permission_callback' => function () {
             return current_user_can('read');
         },
