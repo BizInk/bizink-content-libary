@@ -7,7 +7,7 @@
             "label": "File Download",
             "name": "file_download",
             "aria-label": "",
-            "type": "file",
+            "type": "url",
             "instructions": "",
             "required": 0,
             "conditional_logic": 0,
@@ -16,12 +16,9 @@
                 "class": "",
                 "id": ""
             },
-            "return_format": "url",
-            "library": "all",
-            "min_size": "",
-            "max_size": "",
-            "mime_types": "",
-            "allow_in_bindings": 0
+            "default_value": "",
+            "allow_in_bindings": 0,
+            "placeholder": ""
         },
         {
             "key": "field_6a056f2e83572",
@@ -38,7 +35,7 @@
                 "id": ""
             },
             "message": "",
-            "default_value": 0,
+            "default_value": 1,
             "allow_in_bindings": 0,
             "ui_on_text": "",
             "ui_off_text": "",
@@ -155,5 +152,5 @@
     "display_title": "",
     "allow_ai_access": false,
     "ai_description": "",
-    "modified": 1778749441
+    "modified": 1790088162
 }

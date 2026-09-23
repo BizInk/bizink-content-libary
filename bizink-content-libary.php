@@ -68,8 +68,8 @@ function register_content_types(): void {
             'has_archive'       => false,
             'menu_postion'      => 5,
             'menu_icon'         => $meta['icon'],
-            'supports'          => ($slug == 'bcl_article' || $slug == 'bcl_ebook' || $slug == 'bcl_pdf') ? ['title', 'editor', 'excerpt', 'thumbnail', 'revisions']:['title', 'thumbnail', 'revisions'],
-            'taxonomies'        => $slug == 'bcl_request' ? ['bcl_status']:['bcl_topic','region'],
+            'supports'          => ($slug == 'bcl_article' || $slug == 'bcl_ebook' || $slug == 'bcl_pdf') ? ['title', 'editor', 'excerpt', 'thumbnail', 'revisions']:['title', 'thumbnail', 'revisions','author'],
+            'taxonomies'        => $slug == 'bcl_request' ? []:['bcl_topic','region'],
             'rewrite'           => ['slug' => str_replace('bcl_', '', $slug)],
             'capability_type'   => 'post',
         ]);
@@ -81,19 +81,6 @@ add_action('init', __NAMESPACE__ . '\\register_content_types');
  * Shared topic taxonomy used across all BCL content types.
  */
 function register_topics_taxonomy(): void {
-    register_taxonomy('bcl_status', array_keys([
-        'bcl_request' => 1, 'bcl_article' => 0, 'bcl_ebook' => 0, 'bcl_calculator' => 0,
-        'bcl_tool' => 0, 'bcl_pdf' => 0, 'bcl_excel' => 0, 
-    ]), [
-        'labels'            => [
-            'name'          => 'Status',
-            'singular_name' => 'Status',
-        ],
-        'public'            => true,
-        'show_in_rest'      => true,
-        'hierarchical'      => false,
-        'rewrite'           => ['slug' => 'status'],
-    ]);
 
     register_taxonomy('bcl_topic', array_keys([
         'bcl_article' => 1, 'bcl_ebook' => 1, 'bcl_calculator' => 1,
@@ -124,6 +111,36 @@ function register_topics_taxonomy(): void {
     ]);
 }
 add_action('init', __NAMESPACE__ . '\\register_topics_taxonomy');
+
+/**
+ * Add "Status" and "Author" columns to the Custom Requests admin list.
+ */
+function bcl_request_add_columns(array $columns): array {
+    $date = $columns['date'] ?? null;
+    unset($columns['date']);
+    $columns['bcl_status'] = 'Status';
+    if ($date !== null) {
+        $columns['date'] = $date;
+    }
+    return $columns;
+}
+add_filter('manage_bcl_request_posts_columns', __NAMESPACE__ . '\\bcl_request_add_columns');
+
+function bcl_request_render_column(string $column, int $post_id): void {
+    if ($column === 'bcl_status') {
+        $choices = [
+            'pending'        => 'Pending',
+            'processing'     => 'Processing',
+            'done'           => 'Done',
+            'clientResponse' => 'Client Response',
+            'adminResponse'  => 'Admin Response',
+        ];
+
+        $status = get_field('status', $post_id);
+        echo esc_html($choices[$status] ?? ($status ?: '—'));
+     }
+}
+add_action('manage_bcl_request_posts_custom_column', __NAMESPACE__ . '\\bcl_request_render_column', 10, 2);
 
 // Portal Email
 function bcl_new_user_email($message,  $user, $blogname){
