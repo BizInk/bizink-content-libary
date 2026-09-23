@@ -4,14 +4,16 @@ defined('ABSPATH') || exit;
 
 ini_set('max_execution_time', '300');
 
-function bcl_filter_domains($d){
+function bcl_filter_domains($d)
+{
     // Rows come from the `domains` ACF repeater as ['url' => '...'], but older
     // / API-written data may be a plain string. Handle both.
     $url = is_array($d) ? ($d['url'] ?? '') : (is_string($d) ? $d : '');
     return bcl_normalize_domain($url);
 }
 
-function bcl_normalize_domain($url){
+function bcl_normalize_domain($url)
+{
     if (!is_string($url)) {
         return '';
     }
@@ -21,8 +23,9 @@ function bcl_normalize_domain($url){
     return rtrim($url, '/');
 }
 
-function bcl_getuser_domains($user_id){
-    if(empty($user_id) || function_exists('get_fields') == false){
+function bcl_getuser_domains($user_id)
+{
+    if (empty($user_id) || function_exists('get_fields') == false) {
         return [];
     }
     $user_fields = get_fields('user_' . $user_id);
@@ -37,313 +40,317 @@ function bcl_getuser_domains($user_id){
     return array_values(array_unique(array_filter($domains, 'strlen')));
 }
 
-function bcl_save_user_domains($user_id, array $domains){
-    if(empty($user_id) || function_exists('update_field') == false){
+function bcl_save_user_domains($user_id, array $domains)
+{
+    if (empty($user_id) || function_exists('update_field') == false) {
         return [];
     }
     $domains = array_values(array_unique(array_filter(array_map('bcl_normalize_domain', $domains), 'strlen')));
     // `domains` is an ACF repeater with a single `url` sub-field, so it must be
     // written as an array of rows, not a flat list of strings.
-    $rows = array_map(function($url){ return array('url' => $url); }, $domains);
+    $rows = array_map(function ($url) {
+        return array('url' => $url);
+    }, $domains);
     update_field('field_6aa20c2d34ed6', $rows, 'user_' . $user_id);
     return $domains;
 }
 
 function bcl_calculator_code(WP_POST $post, array $fields)
 {
-	$content = "";
-	ob_start();
+    $content = "";
+    ob_start();
 
-    if(!empty($fields['backgroundColor'])){
+    if (!empty($fields['backgroundColor'])) {
         $fields['outer-background'] = $fields['calc-background'] = $fields['backgroundColor']; // backgroundColor
     }
-    if(!empty($fields['tabColor'])){
+    if (!empty($fields['tabColor'])) {
         $fields['tab-background'] = $fields['tabColor']; // tabColor
     }
-    if(!empty($fields['sliderColor'])){
+    if (!empty($fields['sliderColor'])) {
         $fields['slider-thumb-color']  = $fields['sliderColor']; // sliderColor
     }
-    if(!empty($fields['sliderBgColor'])){
+    if (!empty($fields['sliderBgColor'])) {
         $fields['slider-track-color']  = $fields['sliderBgColor']; // sliderBgColor
     }
-    if(!empty($fields['headerColor'])){
+    if (!empty($fields['headerColor'])) {
         $fields['disclaimer-heading-color'] = $fields['headerColor']; // headerColor
     }
-    if(!empty($fields['textColor'])){
+    if (!empty($fields['textColor'])) {
         $fields['input-color'] = $fields['results-summary-text-color'] = $fields['call-to-action-color'] = $fields['disclaimer-color'] = $fields['intro-font-color'] = $fields['textColor']; // textColor
     }
-    if(!empty($fields['buttonColor'])){
+    if (!empty($fields['buttonColor'])) {
         $fields['button-grad-background'] = $fields['button-background'] = $fields['buttonColor']; //buttonColor
     }
 ?>
-	<!doctype html>
-	<html>
-	<head>
-		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<title><?php echo $post->post_title; ?></title>
-		<script async src="https://portal.bizinkonline.com/resizer.js"></script>
-		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-		<link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap" />
-		<link rel="stylesheet" type="text/css" href="https://smartbizcalcs.com/css/style.css" />
+    <!doctype html>
+    <html>
+
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title><?php echo $post->post_title; ?></title>
+        <script async src="https://portal.bizinkonline.com/resizer.js"></script>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+        <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap" />
+        <link rel="stylesheet" type="text/css" href="https://smartbizcalcs.com/css/style.css" />
         <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
-		
-		<style>
-			/** brand.css */
-			.bizinkEmbed .TSBCcontainer {
-				border: solid 1px var(--brand-tab-border-color);
-			}
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
 
-			:root {
-				/* fonts */
-				--brand-headline-font: <?php echo $fields['headline-font'] ?? "'Poppins', sans-serif"; ?> !important;
-				--brand-headline-font-size: <?php echo $fields['headline-font-size'] ?? '2rem'; ?> !important;
-				--brand-headline-font-weight: <?php echo $fields['headline-font-weight'] ?? '500'; ?> !important;
-				--brand-body-font: <?php echo $fields['body-font'] ?? "'Poppins', sans-serif"; ?> !important;
-				--brand-body-font-size: <?php echo $fields['body-font-size'] ?? '1rem'; ?> !important;
-				--brand-body-font-weight: <?php echo $fields['body-font-weight'] ?? '500'; ?> !important;
-				--brand-input-font-size: <?php echo $fields['input-font-size'] ?? '1rem'; ?> !important;
-				--brand-output-expression-font-size: <?php echo $fields['output-expression-font-size'] ?? '1.5rem'; ?> !important;
-				--brand-output-font-size: <?php echo $fields['output-font-size'] ?? '1.2rem'; ?> !important;
-				--brand-h1-font-size: <?php echo $fields['h1-font-size'] ?? '20rem'; ?> !important;
-				--brand-h2-font-size: <?php echo $fields['h2-font-size'] ?? '1.6rem'; ?> !important;
-				--brand-h3-font-size: <?php echo $fields['h3-font-size'] ?? '1.2rem'; ?> !important;
-				--brand-h4-font-size: <?php echo $fields['h4-font-size'] ?? '1rem'; ?> !important;
-				--brand-h4-font-weight: <?php echo $fields['h4-font-weight'] ?? '600'; ?> !important;
-				--brand-intro-font-color: <?php echo $fields['intro-font-color'] ?? '#000'; ?> !important;
-				--brand-output-font-weight: <?php echo $fields['output-font-weight'] ?? '500'; ?> !important;
-				--brand-btn-font: <?php echo $fields['btn-font'] ?? "'Poppins', sans-serif"; ?> !important;
-				--brand-btn-font-size: <?php echo $fields['btn-font-size'] ?? '1.2rem'; ?> !important;
-				--brand-btn-font-weight: <?php echo $fields['btn-font-weight'] ?? '600'; ?> !important;
-				--brand-button-font-transform: <?php echo $fields['button-font-transform'] ?? 'none'; ?> !important;
-				--brand-disclaimer-heading-size: <?php echo $fields['disclaimer-heading-size'] ?? '1.0rem'; ?> !important;
-				--brand-disclaimer-heading-weight: <?php echo $fields['disclaimer-heading-weight'] ?? '600'; ?> !important;
-				--brand-disclaimer-size: <?php echo $fields['disclaimer-size'] ?? '0.8rem'; ?> !important;
-				--brand-largeAnswerText-font-size: <?php echo $fields['largeanswerttext-font-size'] ?? '2.5rem'; ?> !important;
-				--brand-largeAnswerText-font-weight: <?php echo $fields['largeanswerttext-font-weight'] ?? '500'; ?> !important;
+        <style>
+            /** brand.css */
+            .bizinkEmbed .TSBCcontainer {
+                border: solid 1px var(--brand-tab-border-color);
+            }
 
-				/* backgrounds */
-				--brand-outer-background: <?php echo $fields['outer-background'] ?? '#fff'; ?> !important;
-				--brand-calc-background: <?php echo $fields['calc-background'] ?? '#fefefe'; ?> !important;
-				--brand-input-background: <?php echo $fields['input-background'] ?? '#eee'; ?> !important;
-				--brand-output-background: <?php echo $fields['output-background'] ?? 'rgba(113, 134, 157, .1)'; ?> !important;
-				--brand-output-effect: <?php echo $fields['output-effect-hover'] ?? '0 12px 15px'; ?> <?php echo $fields['output-effect-color'] ?? 'rgba(140, 152, 164, .1)'; ?> !important;
-				--brand-tool-shape: <?php echo $fields['tool-shape'] ?? '8px 8px 8px 8px'; ?> !important;
-				--brand-tool-effect: <?php echo $fields['tool-effect-color'] ?? 'rgba(0, 0, 0, 0.2)'; ?> <?php echo $fields['tool-effect'] ?? '5px 5px 5px '; ?> !important;
-				--brand-subtotal-background: <?php echo $fields['subtotal-background'] ?? '#036'; ?> !important;
-				--brand-subtotal-text-color: <?php echo $fields['subtotal-text-color'] ?? '#fff'; ?> !important;
-				--brand-results-summary-background: <?php echo $fields['results-summary-background'] ?? 'rgba(0, 0, 0, 0.1)'; ?> !important;
-				--brand-results-summary-text-color: <?php echo $fields['results-summary-text-color'] ?? '#036'; ?> !important;
-				--brand-results-summary-border-radius: <?php echo $fields['results-summary-border-radius'] ?? '.5rem'; ?> !important;
-				--brand-results-summary-border-width: <?php echo $fields['results-summary-border-width'] ?? '1px'; ?> !important;
-				--brand-results-summary-border-style: <?php echo $fields['results-summary-border-style'] ?? 'solid'; ?> !important;
-				--brand-results-summary-border-color: <?php echo $fields['results-summary-border-color'] ?? 'rgba(0, 0, 0, 0.12)'; ?> !important;
+            :root {
+                /* fonts */
+                --brand-headline-font: <?php echo $fields['headline-font'] ?? "'Poppins', sans-serif"; ?> !important;
+                --brand-headline-font-size: <?php echo $fields['headline-font-size'] ?? '2rem'; ?> !important;
+                --brand-headline-font-weight: <?php echo $fields['headline-font-weight'] ?? '500'; ?> !important;
+                --brand-body-font: <?php echo $fields['body-font'] ?? "'Poppins', sans-serif"; ?> !important;
+                --brand-body-font-size: <?php echo $fields['body-font-size'] ?? '1rem'; ?> !important;
+                --brand-body-font-weight: <?php echo $fields['body-font-weight'] ?? '500'; ?> !important;
+                --brand-input-font-size: <?php echo $fields['input-font-size'] ?? '1rem'; ?> !important;
+                --brand-output-expression-font-size: <?php echo $fields['output-expression-font-size'] ?? '1.5rem'; ?> !important;
+                --brand-output-font-size: <?php echo $fields['output-font-size'] ?? '1.2rem'; ?> !important;
+                --brand-h1-font-size: <?php echo $fields['h1-font-size'] ?? '20rem'; ?> !important;
+                --brand-h2-font-size: <?php echo $fields['h2-font-size'] ?? '1.6rem'; ?> !important;
+                --brand-h3-font-size: <?php echo $fields['h3-font-size'] ?? '1.2rem'; ?> !important;
+                --brand-h4-font-size: <?php echo $fields['h4-font-size'] ?? '1rem'; ?> !important;
+                --brand-h4-font-weight: <?php echo $fields['h4-font-weight'] ?? '600'; ?> !important;
+                --brand-intro-font-color: <?php echo $fields['intro-font-color'] ?? '#000'; ?> !important;
+                --brand-output-font-weight: <?php echo $fields['output-font-weight'] ?? '500'; ?> !important;
+                --brand-btn-font: <?php echo $fields['btn-font'] ?? "'Poppins', sans-serif"; ?> !important;
+                --brand-btn-font-size: <?php echo $fields['btn-font-size'] ?? '1.2rem'; ?> !important;
+                --brand-btn-font-weight: <?php echo $fields['btn-font-weight'] ?? '600'; ?> !important;
+                --brand-button-font-transform: <?php echo $fields['button-font-transform'] ?? 'none'; ?> !important;
+                --brand-disclaimer-heading-size: <?php echo $fields['disclaimer-heading-size'] ?? '1.0rem'; ?> !important;
+                --brand-disclaimer-heading-weight: <?php echo $fields['disclaimer-heading-weight'] ?? '600'; ?> !important;
+                --brand-disclaimer-size: <?php echo $fields['disclaimer-size'] ?? '0.8rem'; ?> !important;
+                --brand-largeAnswerText-font-size: <?php echo $fields['largeanswerttext-font-size'] ?? '2.5rem'; ?> !important;
+                --brand-largeAnswerText-font-weight: <?php echo $fields['largeanswerttext-font-weight'] ?? '500'; ?> !important;
 
-				/* text color */
-				--brand-calc-color: <?php echo $fields['calc-color'] ?? '#036'; ?> !important;
-				--brand-input-color: <?php echo $fields['input-color'] ?? '#080808'; ?> !important;
-				--brand-output-color: <?php echo $fields['output-color'] ?? '#036'; ?> !important;
-				--brand-disclaimer-heading-color: <?php echo $fields['disclaimer-heading-color'] ?? '#000'; ?> !important;
-				--brand-disclaimer-color: <?php echo $fields['disclaimer-color'] ?? '#000'; ?> !important;
-				--brand-call-to-action-color: <?php echo $fields['call-to-action-color'] ?? '#000'; ?> !important;
+                /* backgrounds */
+                --brand-outer-background: <?php echo $fields['outer-background'] ?? '#fff'; ?> !important;
+                --brand-calc-background: <?php echo $fields['calc-background'] ?? '#fefefe'; ?> !important;
+                --brand-input-background: <?php echo $fields['input-background'] ?? '#eee'; ?> !important;
+                --brand-output-background: <?php echo $fields['output-background'] ?? 'rgba(113, 134, 157, .1)'; ?> !important;
+                --brand-output-effect: <?php echo $fields['output-effect-hover'] ?? '0 12px 15px'; ?> <?php echo $fields['output-effect-color'] ?? 'rgba(140, 152, 164, .1)'; ?> !important;
+                --brand-tool-shape: <?php echo $fields['tool-shape'] ?? '8px 8px 8px 8px'; ?> !important;
+                --brand-tool-effect: <?php echo $fields['tool-effect-color'] ?? 'rgba(0, 0, 0, 0.2)'; ?> <?php echo $fields['tool-effect'] ?? '5px 5px 5px '; ?> !important;
+                --brand-subtotal-background: <?php echo $fields['subtotal-background'] ?? '#036'; ?> !important;
+                --brand-subtotal-text-color: <?php echo $fields['subtotal-text-color'] ?? '#fff'; ?> !important;
+                --brand-results-summary-background: <?php echo $fields['results-summary-background'] ?? 'rgba(0, 0, 0, 0.1)'; ?> !important;
+                --brand-results-summary-text-color: <?php echo $fields['results-summary-text-color'] ?? '#036'; ?> !important;
+                --brand-results-summary-border-radius: <?php echo $fields['results-summary-border-radius'] ?? '.5rem'; ?> !important;
+                --brand-results-summary-border-width: <?php echo $fields['results-summary-border-width'] ?? '1px'; ?> !important;
+                --brand-results-summary-border-style: <?php echo $fields['results-summary-border-style'] ?? 'solid'; ?> !important;
+                --brand-results-summary-border-color: <?php echo $fields['results-summary-border-color'] ?? 'rgba(0, 0, 0, 0.12)'; ?> !important;
 
-				/* buttons*/
-				--brand-button-background: <?php echo $fields['button-background'] ?? '#000'; ?> !important;
-				--brand-button-grad-background: <?php echo $fields['button-grad-background'] ?? 'linear-gradient(6deg, #575757 0%, #1f1f1f 35%, #000 100%)'; ?> !important;
-				--brand-button-background-hover: <?php echo $fields['button-background-hover'] ?? '#1f1f1f'; ?> !important;
-				--brand-button-shape: <?php echo $fields['button-shape'] ?? '35px'; ?> !important;
-				--brand-button-padding: <?php echo $fields['button-padding'] ?? '.5rem 1rem'; ?> !important;
-				--brand-button-width: <?php echo $fields['button-width'] ?? 'auto'; ?> !important;
-				--brand-button-text-color: <?php echo $fields['button-text-color'] ?? '#fff'; ?> !important;
-				--brand-button-text-hover-color: <?php echo $fields['button-text-hover-color'] ?? '#fff'; ?> !important;
-				--brand-button-effect: <?php echo $fields['button-effect-color'] ?? 'rgba(0, 0, 0, 0)'; ?> <?php echo $fields['button-effect'] ?? '0px 5px 15px'; ?> !important;
-				--brand-button-hover-effect: <?php echo $fields['button-hover-effect-color'] ?? 'rgba(0, 0, 0, 0)'; ?> <?php echo $fields['button-hover-effect'] ?? '0px 5px 15px'; ?> !important;
+                /* text color */
+                --brand-calc-color: <?php echo $fields['calc-color'] ?? '#036'; ?> !important;
+                --brand-input-color: <?php echo $fields['input-color'] ?? '#080808'; ?> !important;
+                --brand-output-color: <?php echo $fields['output-color'] ?? '#036'; ?> !important;
+                --brand-disclaimer-heading-color: <?php echo $fields['disclaimer-heading-color'] ?? '#000'; ?> !important;
+                --brand-disclaimer-color: <?php echo $fields['disclaimer-color'] ?? '#000'; ?> !important;
+                --brand-call-to-action-color: <?php echo $fields['call-to-action-color'] ?? '#000'; ?> !important;
 
-				/* CTA buttons */
-				--brand-callToActionButton1-background: <?php echo $fields['calltoactionbutton1-background'] ?? '#be1749'; ?> !important;
-				--brand-callToActionButton1-background-hover: <?php echo $fields['calltoactionbutton1-background-hover'] ?? '#307FE2'; ?> !important;
-				--brand-callToActionButton1-shape: <?php echo $fields['calltoactionbutton1-shape'] ?? '35px'; ?> !important;
-				--brand-callToActionButton1-padding: <?php echo $fields['calltoactionbutton1-padding'] ?? '.5rem 1rem'; ?> !important;
-				--brand-callToActionButton1-text-color: <?php echo $fields['calltoactionbutton1-text-color'] ?? '#fff'; ?> !important;
-				--brand-callToActionButton1-text-hover-color: <?php echo $fields['calltoactionbutton1-text-hover-color'] ?? '#fff'; ?> !important;
-				--brand-callToActionButton1-effect: <?php echo $fields['calltoactionbutton1-effect-color'] ?? 'rgba(0, 0, 0, 0.35)'; ?> <?php echo $fields['calltoactionbutton1-effect'] ?? '0px 5px 15px'; ?> !important;
-				--brand-callToActionButton1-hover-effect: <?php echo $fields['calltoactionbutton1-hover-effect-color'] ?? 'rgba(0, 0, 0, 0.35)'; ?> <?php echo $fields['calltoactionbutton1-effect-hover'] ?? '0px 5px 15px'; ?> !important;
+                /* buttons*/
+                --brand-button-background: <?php echo $fields['button-background'] ?? '#000'; ?> !important;
+                --brand-button-grad-background: <?php echo $fields['button-grad-background'] ?? 'linear-gradient(6deg, #575757 0%, #1f1f1f 35%, #000 100%)'; ?> !important;
+                --brand-button-background-hover: <?php echo $fields['button-background-hover'] ?? '#1f1f1f'; ?> !important;
+                --brand-button-shape: <?php echo $fields['button-shape'] ?? '35px'; ?> !important;
+                --brand-button-padding: <?php echo $fields['button-padding'] ?? '.5rem 1rem'; ?> !important;
+                --brand-button-width: <?php echo $fields['button-width'] ?? 'auto'; ?> !important;
+                --brand-button-text-color: <?php echo $fields['button-text-color'] ?? '#fff'; ?> !important;
+                --brand-button-text-hover-color: <?php echo $fields['button-text-hover-color'] ?? '#fff'; ?> !important;
+                --brand-button-effect: <?php echo $fields['button-effect-color'] ?? 'rgba(0, 0, 0, 0)'; ?> <?php echo $fields['button-effect'] ?? '0px 5px 15px'; ?> !important;
+                --brand-button-hover-effect: <?php echo $fields['button-hover-effect-color'] ?? 'rgba(0, 0, 0, 0)'; ?> <?php echo $fields['button-hover-effect'] ?? '0px 5px 15px'; ?> !important;
 
-				--brand-callToActionButton2-background: <?php echo $fields['calltoactionbutton2-background'] ?? '#307FE2'; ?> !important;
-				--brand-callToActionButton2-background-hover: <?php echo $fields['calltoactionbutton2-background-hover'] ?? '#001871'; ?> !important;
-				--brand-callToActionButton2-shape: <?php echo $fields['calltoactionbutton2-shape'] ?? '35px'; ?> !important;
-				--brand-callToActionButton2-padding: <?php echo $fields['calltoactionbutton2-padding'] ?? '.5rem 1rem'; ?> !important;
-				--brand-callToActionButton2-text-color: <?php echo $fields['calltoactionbutton2-text-color'] ?? '#fff'; ?> !important;
-				--brand-callToActionButton2-text-hover-color: <?php echo $fields['calltoactionbutton2-text-hover-color'] ?? '#fff'; ?> !important;
-				--brand-callToActionButton2-effect: <?php echo $fields['calltoactionbutton2-effect-color'] ?? 'rgba(0, 0, 0, 0)'; ?> <?php echo $fields['calltoactionbutton2-effect'] ?? '0px 5px 15px'; ?> !important;
-				--brand-callToActionButton2-hover-effect: <?php echo $fields['calltoactionbutton2-hover-effect-color'] ?? 'rgba(0, 0, 0, 0.35)'; ?> <?php echo $fields['calltoactionbutton2-effect-hover'] ?? '0px 5px 15px'; ?> !important;
+                /* CTA buttons */
+                --brand-callToActionButton1-background: <?php echo $fields['calltoactionbutton1-background'] ?? '#be1749'; ?> !important;
+                --brand-callToActionButton1-background-hover: <?php echo $fields['calltoactionbutton1-background-hover'] ?? '#307FE2'; ?> !important;
+                --brand-callToActionButton1-shape: <?php echo $fields['calltoactionbutton1-shape'] ?? '35px'; ?> !important;
+                --brand-callToActionButton1-padding: <?php echo $fields['calltoactionbutton1-padding'] ?? '.5rem 1rem'; ?> !important;
+                --brand-callToActionButton1-text-color: <?php echo $fields['calltoactionbutton1-text-color'] ?? '#fff'; ?> !important;
+                --brand-callToActionButton1-text-hover-color: <?php echo $fields['calltoactionbutton1-text-hover-color'] ?? '#fff'; ?> !important;
+                --brand-callToActionButton1-effect: <?php echo $fields['calltoactionbutton1-effect-color'] ?? 'rgba(0, 0, 0, 0.35)'; ?> <?php echo $fields['calltoactionbutton1-effect'] ?? '0px 5px 15px'; ?> !important;
+                --brand-callToActionButton1-hover-effect: <?php echo $fields['calltoactionbutton1-hover-effect-color'] ?? 'rgba(0, 0, 0, 0.35)'; ?> <?php echo $fields['calltoactionbutton1-effect-hover'] ?? '0px 5px 15px'; ?> !important;
 
-				/* chart colors */
-				--brand-chart-primary: <?php echo $fields['chart-primary'] ?? '#036'; ?> !important;
-				/* primary series / savings growth */
-				--brand-chart-secondary: <?php echo $fields['chart-secondary'] ?? '#377dff'; ?> !important;
-				/* secondary bar (e.g. wants) */
-				--brand-chart-tertiary: <?php echo $fields['chart-tertiary'] ?? '#4caf50'; ?> !important;
-				/* tertiary bar (e.g. savings) */
-				--brand-chart-line: <?php echo $fields['chart-line'] ?? '#001871'; ?> !important;
-				/* default line color for projections */
-				--brand-chart-danger: <?php echo $fields['chart-danger'] ?? '#377dff'; ?> !important;
-				/* warning/loan/debt color */
+                --brand-callToActionButton2-background: <?php echo $fields['calltoactionbutton2-background'] ?? '#307FE2'; ?> !important;
+                --brand-callToActionButton2-background-hover: <?php echo $fields['calltoactionbutton2-background-hover'] ?? '#001871'; ?> !important;
+                --brand-callToActionButton2-shape: <?php echo $fields['calltoactionbutton2-shape'] ?? '35px'; ?> !important;
+                --brand-callToActionButton2-padding: <?php echo $fields['calltoactionbutton2-padding'] ?? '.5rem 1rem'; ?> !important;
+                --brand-callToActionButton2-text-color: <?php echo $fields['calltoactionbutton2-text-color'] ?? '#fff'; ?> !important;
+                --brand-callToActionButton2-text-hover-color: <?php echo $fields['calltoactionbutton2-text-hover-color'] ?? '#fff'; ?> !important;
+                --brand-callToActionButton2-effect: <?php echo $fields['calltoactionbutton2-effect-color'] ?? 'rgba(0, 0, 0, 0)'; ?> <?php echo $fields['calltoactionbutton2-effect'] ?? '0px 5px 15px'; ?> !important;
+                --brand-callToActionButton2-hover-effect: <?php echo $fields['calltoactionbutton2-hover-effect-color'] ?? 'rgba(0, 0, 0, 0.35)'; ?> <?php echo $fields['calltoactionbutton2-effect-hover'] ?? '0px 5px 15px'; ?> !important;
 
-				/* sliders */
-				--brand-slider-track-color: <?php echo $fields['slider-track-color'] ?? '#d0d4e5'; ?> !important;
-				--brand-slider-thumb-color: <?php echo $fields['slider-thumb-color'] ?? '#001871'; ?> !important;
+                /* chart colors */
+                --brand-chart-primary: <?php echo $fields['chart-primary'] ?? '#036'; ?> !important;
+                /* primary series / savings growth */
+                --brand-chart-secondary: <?php echo $fields['chart-secondary'] ?? '#377dff'; ?> !important;
+                /* secondary bar (e.g. wants) */
+                --brand-chart-tertiary: <?php echo $fields['chart-tertiary'] ?? '#4caf50'; ?> !important;
+                /* tertiary bar (e.g. savings) */
+                --brand-chart-line: <?php echo $fields['chart-line'] ?? '#001871'; ?> !important;
+                /* default line color for projections */
+                --brand-chart-danger: <?php echo $fields['chart-danger'] ?? '#377dff'; ?> !important;
+                /* warning/loan/debt color */
 
-				/* tabs*/
-				--brand-tab-background: <?php echo $fields['tab-background'] ?? '#eee'; ?> !important;
-				--brand-tab-inactive-background: <?php echo $fields['tab-inactive-background'] ?? '#ccc'; ?> !important;
-				--brand-tab-active-color: <?php echo $fields['tab-active-color'] ?? '#000'; ?> !important;
-				--brand-tab-hover-background: <?php echo $fields['tab-hover-background'] ?? '#bbb'; ?> !important;
-				--brand-tab-hover-color: <?php echo $fields['tab-hover-color'] ?? '#000'; ?> !important;
-				--brand-tab-border-shape: <?php echo $fields['tab-border-shape'] ?? '8px'; ?> !important;
-				--brand-tab-border-color: <?php echo $fields['tab-border-color'] ?? '#b8b7b7'; ?> !important;
-				--brand-tab-text-color: <?php echo $fields['tab-text-color'] ?? '#000'; ?> !important;
-				--brand-tab-font-size: <?php echo $fields['tab-font-size'] ?? '1.1'; ?>rem !important;
-				--brand-tab-font-weight: <?php echo $fields['tab-font-weight'] ?? '600'; ?> !important;
-			}
+                /* sliders */
+                --brand-slider-track-color: <?php echo $fields['slider-track-color'] ?? '#d0d4e5'; ?> !important;
+                --brand-slider-thumb-color: <?php echo $fields['slider-thumb-color'] ?? '#001871'; ?> !important;
+
+                /* tabs*/
+                --brand-tab-background: <?php echo $fields['tab-background'] ?? '#eee'; ?> !important;
+                --brand-tab-inactive-background: <?php echo $fields['tab-inactive-background'] ?? '#ccc'; ?> !important;
+                --brand-tab-active-color: <?php echo $fields['tab-active-color'] ?? '#000'; ?> !important;
+                --brand-tab-hover-background: <?php echo $fields['tab-hover-background'] ?? '#bbb'; ?> !important;
+                --brand-tab-hover-color: <?php echo $fields['tab-hover-color'] ?? '#000'; ?> !important;
+                --brand-tab-border-shape: <?php echo $fields['tab-border-shape'] ?? '8px'; ?> !important;
+                --brand-tab-border-color: <?php echo $fields['tab-border-color'] ?? '#b8b7b7'; ?> !important;
+                --brand-tab-text-color: <?php echo $fields['tab-text-color'] ?? '#000'; ?> !important;
+                --brand-tab-font-size: <?php echo $fields['tab-font-size'] ?? '1.1'; ?>rem !important;
+                --brand-tab-font-weight: <?php echo $fields['tab-font-weight'] ?? '600'; ?> !important;
+            }
 
             * {
                 color: var(--brand-intro-font-color);
             }
-		</style>
+        </style>
         <script>
-            
-
             // brandContent.js
 
             const brandContent = {
-            // Currency symbol used by calculator displays
-            currencyCode: '<?php echo $fields['currencyCode'] ?? 'USD'; ?>',
-            disclaimerHead: '<?php echo $fields['disclaimerHead'] ?? 'Disclaimer'; ?>',
-            disclaimerText: '<?php echo $fields['disclaimerText'] ?? 'Figures and results from these calculators are a general guide only and are not financial or professional advice. Consider getting professional advice before making decisions based on these results.'; ?>',
-            // Contact information (applies to all calculators)
-            contactAddress: '<?php echo $fields['contactEmail'] ?? 'Optional email address for enquiries here'; ?>',
-            contactText: '<?php echo $fields['contactText'] ?? 'Add your call to action text here.'; ?>',
-            tab1: '<?php echo $fields['tabLabel1'] ?? 'Calculator'; ?>',
-            tab2: '<?php echo $fields['tabLabel2'] ?? 'About this calculator'; ?>',
-            tab3: '<?php echo $fields['tabLabel3'] ?? 'Help'; ?>',
-            tab4: '<?php echo $fields['tabLabel4'] ?? 'AI Coach'; ?>',
-            defaultTab2Text: '<p>This section explains what this calculator does, what inputs it uses, and how to interpret the results.</p>',
-            defaultTab3Text: '<p>This section provides guidance on how to use this calculator and what to consider before acting on the results.</p>',
-            defaultTab4Text: '<p>Use the AI coach to ask questions about this calculator, your numbers, and how they relate to your business decisions.</p>',
-            // Optional override for AI coach disclaimer (HTML allowed)
-            defaultAiCoachDisclaimerText: '<?php echo $fields['aicoachdisclaimertext'] ?? ''; ?>',
-            // Global toggles for optional sections
-            showDisclaimer: <?php echo ($fields['showDisclaimer'] ?? true) ? 'true' : 'false'; ?>,
-            showContactAddress: <?php echo ($fields['showContactEmail'] ?? false) ? 'true' : 'false'; ?>,
-            showContactText: <?php echo ($fields['showContactText'] ?? false) ? 'true' : 'false'; ?>,
-            mobileIconCalc: 'https://smartbizcalcs.com/bizink/embedau/css/images/icon-calc.svg',
-            mobileIconInfo: 'https://smartbizcalcs.com/bizink/embedau/css/images/icon-info.svg',
-            mobileIconHelp: 'https://smartbizcalcs.com/bizink/embedau/css/images/icon-help.svg',
+                // Currency symbol used by calculator displays
+                currencyCode: '<?php echo $fields['currencyCode'] ?? 'USD'; ?>',
+                disclaimerHead: '<?php echo $fields['disclaimerHead'] ?? 'Disclaimer'; ?>',
+                disclaimerText: '<?php echo $fields['disclaimerText'] ?? 'Figures and results from these calculators are a general guide only and are not financial or professional advice. Consider getting professional advice before making decisions based on these results.'; ?>',
+                // Contact information (applies to all calculators)
+                contactAddress: '<?php echo $fields['contactEmail'] ?? 'Optional email address for enquiries here'; ?>',
+                contactText: '<?php echo $fields['contactText'] ?? 'Add your call to action text here.'; ?>',
+                tab1: '<?php echo $fields['tabLabel1'] ?? 'Calculator'; ?>',
+                tab2: '<?php echo $fields['tabLabel2'] ?? 'About this calculator'; ?>',
+                tab3: '<?php echo $fields['tabLabel3'] ?? 'Help'; ?>',
+                tab4: '<?php echo $fields['tabLabel4'] ?? 'AI Coach'; ?>',
+                defaultTab2Text: '<p>This section explains what this calculator does, what inputs it uses, and how to interpret the results.</p>',
+                defaultTab3Text: '<p>This section provides guidance on how to use this calculator and what to consider before acting on the results.</p>',
+                defaultTab4Text: '<p>Use the AI coach to ask questions about this calculator, your numbers, and how they relate to your business decisions.</p>',
+                // Optional override for AI coach disclaimer (HTML allowed)
+                defaultAiCoachDisclaimerText: '<?php echo $fields['aicoachdisclaimertext'] ?? ''; ?>',
+                // Global toggles for optional sections
+                showDisclaimer: <?php echo ($fields['showDisclaimer'] ?? true) ? 'true' : 'false'; ?>,
+                showContactAddress: <?php echo ($fields['showContactEmail'] ?? false) ? 'true' : 'false'; ?>,
+                showContactText: <?php echo ($fields['showContactText'] ?? false) ? 'true' : 'false'; ?>,
+                mobileIconCalc: 'https://smartbizcalcs.com/bizink/embedau/css/images/icon-calc.svg',
+                mobileIconInfo: 'https://smartbizcalcs.com/bizink/embedau/css/images/icon-info.svg',
+                mobileIconHelp: 'https://smartbizcalcs.com/bizink/embedau/css/images/icon-help.svg',
             };
 
             // content.js
 
             // Content for Break-even plus profit calculator
 
-            const aiCoachDisclaimerText = '<?php 
-                if(isset($fields['aicoachdisclaimertext'])){
-                    echo str_replace('"','\"',trim(preg_replace('/\s+/', ' ', $fields['aicoachdisclaimertext'] )));
-                }
-                else{
-                    echo "<div class=\"mt-4 pt-3 border-top\"><p class=\"mb-1\"><strong>Disclaimer</strong></p><p class=\"mb-0\">This AI Coach tool helps you create example prompts that you may choose to use with third party artificial intelligence (AI) platforms. It does not provide financial, legal, tax, or other professional advice, and it does not make recommendations about any products or services. Any prompts or examples generated by this tool are for general informational and educational purposes only. They are not tailored to your personal financial situation, objectives, or needs, and they may produce inaccurate, incomplete, biased, or outdated results when used with external AI tools. We do not control, monitor, or verify the content or accuracy of any information generated by third party AI platforms, and we do not endorse or guarantee any results obtained from those platforms. You are solely responsible for how you use any prompts and for all decisions you make based on AI generated content. We are not responsible for the security, privacy, or use of any information you choose to provide to third party AI providers.</p></div>";
-                }
-            ?>';
+            const aiCoachDisclaimerText = '<?php
+                                            if (isset($fields['aicoachdisclaimertext'])) {
+                                                echo str_replace('"', '\"', trim(preg_replace('/\s+/', ' ', $fields['aicoachdisclaimertext'])));
+                                            } else {
+                                                echo "<div class=\"mt-4 pt-3 border-top\"><p class=\"mb-1\"><strong>Disclaimer</strong></p><p class=\"mb-0\">This AI Coach tool helps you create example prompts that you may choose to use with third party artificial intelligence (AI) platforms. It does not provide financial, legal, tax, or other professional advice, and it does not make recommendations about any products or services. Any prompts or examples generated by this tool are for general informational and educational purposes only. They are not tailored to your personal financial situation, objectives, or needs, and they may produce inaccurate, incomplete, biased, or outdated results when used with external AI tools. We do not control, monitor, or verify the content or accuracy of any information generated by third party AI platforms, and we do not endorse or guarantee any results obtained from those platforms. You are solely responsible for how you use any prompts and for all decisions you make based on AI generated content. We are not responsible for the security, privacy, or use of any information you choose to provide to third party AI providers.</p></div>";
+                                            }
+                                            ?>';
 
-const content = [
-  {
-    groupId: <?php echo $post->ID; ?>,
-    CalcName: '<?php echo $post->post_title; ?>',
-    showHelpTab: <?php if(isset($fields['showhelptab']) && $fields['showhelptab']): echo "true"; else: echo "false"; endif; ?>,
-    showTabs: <?php if(isset($fields['showtabs']) && $fields['showtabs']): echo "true"; else: echo "false"; endif; ?>,
-    // Optional AI coach tab
-    showCoachTab: <?php if(isset($fields['showcoachtab']) && $fields['showcoachtab']): echo "true"; else: echo "false"; endif; ?>,
-    defaultValues: {
-      overheads: 510000,
-      pricePerUnit: 1000,
-      variableCostPerUnit: 350,
-      pricePerUnitSlider: 1000,
-      variableCostPerUnitSlider: 350,
+            const content = [{
+                groupId: <?php echo $post->ID; ?>,
+                CalcName: '<?php echo $post->post_title; ?>',
+                showHelpTab: <?php if (isset($fields['showhelptab']) && $fields['showhelptab']): echo "true";
+                                else: echo "false";
+                                endif; ?>,
+                showTabs: <?php if (isset($fields['showtabs']) && $fields['showtabs']): echo "true";
+                            else: echo "false";
+                            endif; ?>,
+                // Optional AI coach tab
+                showCoachTab: <?php if (isset($fields['showcoachtab']) && $fields['showcoachtab']): echo "true";
+                                else: echo "false";
+                                endif; ?>,
+                defaultValues: {
+                    overheads: 510000,
+                    pricePerUnit: 1000,
+                    variableCostPerUnit: 350,
+                    pricePerUnitSlider: 1000,
+                    variableCostPerUnitSlider: 350,
 
-      availableCash: 100000,
-      monthlyExpense: 30000,
-      monthlyIncome: 25000,
-    },
-    Intro: '<?php echo isset($fields['intro']) ? $fields['intro']:'Estimate how many units you need to sell to cover your overheads and achieve a target profit over a set time period.' ?>',
-    tab2Text: 'TestTab2Text',
-    tab3Text:'TestTab3Text', 
-    tab4Text: 'TestTab4Text',
-    resultIntro: '',
-    // Optional CTA buttons (below resultIntro)
-   //callToActionButton1: { text: 'Apply now', link: '#' },
-   // callToActionButton2: { text: 'Learn more', link: '#' },
-    singleColumnLayout: <?php if(isset($fields['singlecolumnlayout']) && $fields['singlecolumnlayout']): echo "true"; else: echo "false"; endif; ?>,
-    labelsFor: {
-      overheads: 'Fixed costs (overheads)',
-      pricePerUnit: 'Selling price per unit',
-      variableCostPerUnit: 'Variable cost per unit',
+                    availableCash: 100000,
+                    monthlyExpense: 30000,
+                    monthlyIncome: 25000,
+                },
+                Intro: '<?php echo isset($fields['intro']) ? $fields['intro'] : 'Estimate how many units you need to sell to cover your overheads and achieve a target profit over a set time period.' ?>',
+                tab2Text: 'TestTab2Text',
+                tab3Text: 'TestTab3Text',
+                tab4Text: 'TestTab4Text',
+                resultIntro: '',
+                // Optional CTA buttons (below resultIntro)
+                //callToActionButton1: { text: 'Apply now', link: '#' },
+                // callToActionButton2: { text: 'Learn more', link: '#' },
+                singleColumnLayout: <?php if (isset($fields['singlecolumnlayout']) && $fields['singlecolumnlayout']): echo "true";
+                                    else: echo "false";
+                                    endif; ?>,
+                labelsFor: {
+                    overheads: 'Fixed costs (overheads)',
+                    pricePerUnit: 'Selling price per unit',
+                    variableCostPerUnit: 'Variable cost per unit',
 
-      availableCash: 'Available cash',
-      monthlyExpense: 'Monthly expense',
-      monthlyIncome: 'Monthly income',
-    },
-    labels: {
-      beHeadingTargets: 'Your targets and costs',
-      beHeadingSales: 'Sales',
-      bePriceExplanation: 'You can type an amount or use the slider to see how changes in your price per unit affect the result.',
-      beVariableExplanation: 'Use this to explore how higher or lower unit costs change the number of units you need to sell.',
-      calculateBreakEven: 'Calculate break-even',
-      beResultHeading: 'Total units to sell',
-      beLabelTotalSales: 'Total sales required',
+                    availableCash: 'Available cash',
+                    monthlyExpense: 'Monthly expense',
+                    monthlyIncome: 'Monthly income',
+                },
+                labels: {
+                    beHeadingTargets: 'Your targets and costs',
+                    beHeadingSales: 'Sales',
+                    bePriceExplanation: 'You can type an amount or use the slider to see how changes in your price per unit affect the result.',
+                    beVariableExplanation: 'Use this to explore how higher or lower unit costs change the number of units you need to sell.',
+                    calculateBreakEven: 'Calculate break-even',
+                    beResultHeading: 'Total units to sell',
+                    beLabelTotalSales: 'Total sales required',
 
-      bdHeadingPosition: 'Your cash position',
-      calculateBurnDown: 'Calculate cash burn',
-      bdResultHeading: 'Your cash zero date',
-    },
-    noCashMessage: 'Enter your available cash to estimate when you could run out of money.',
-    noBurnMessage: 'Your income is at least equal to your monthly expenses, so this simple cash burn calculation does not show a cash zero date.',
-    zeroDateSummary: "The cash zero date is an estimate of when you could run out of money based on today's available cash and your monthly net burn. To move this date, look for ways to increase income, reduce expenses, or increase available cash by collecting receivables, raising capital or securing funding.",
-	noBurnLabel: 'No burn',
+                    bdHeadingPosition: 'Your cash position',
+                    calculateBurnDown: 'Calculate cash burn',
+                    bdResultHeading: 'Your cash zero date',
+                },
+                noCashMessage: 'Enter your available cash to estimate when you could run out of money.',
+                noBurnMessage: 'Your income is at least equal to your monthly expenses, so this simple cash burn calculation does not show a cash zero date.',
+                zeroDateSummary: "The cash zero date is an estimate of when you could run out of money based on today's available cash and your monthly net burn. To move this date, look for ways to increase income, reduce expenses, or increase available cash by collecting receivables, raising capital or securing funding.",
+                noBurnLabel: 'No burn',
 
-    resultsText: {
-      breakEvenSummaryMessages: {
-        missingInputs:
-          'Enter your overheads, sales price and costs to see the break-even result.',
-        basePrefix:
-          'Based on these numbers, you would need to sell about ',
-        baseSuffix:
-          ' units in total to cover your overheads.',
-      },
-    },
-  },
-];
+                resultsText: {
+                    breakEvenSummaryMessages: {
+                        missingInputs: 'Enter your overheads, sales price and costs to see the break-even result.',
+                        basePrefix: 'Based on these numbers, you would need to sell about ',
+                        baseSuffix: ' units in total to cover your overheads.',
+                    },
+                },
+            }, ];
         </script>
-		<?php
-		echo $fields['head_code'] ?? '';
-		?>
-	</head>
+        <?php
+        echo $fields['head_code'] ?? '';
+        ?>
+    </head>
 
-	<body>
-		<script>
-			window.iframeResizer = {
-				license: "GPLv3"
-			}
-		</script>
+    <body>
+        <script>
+            window.iframeResizer = {
+                license: "GPLv3"
+            }
+        </script>
         <?php echo $fields['body_code'] ?? $post->post_content; ?>
         <script src="https://smartbizcalcs.com/js/calculators.js"></script>
-	</body>
+    </body>
 
-	</html>
-<?php
-	$content = ob_get_contents();
-	ob_end_clean();
-	return $content;
+    </html>
+    <?php
+    $content = ob_get_contents();
+    ob_end_clean();
+    return $content;
 }
 
 
@@ -358,20 +365,19 @@ function bcl_noAcfResponce()
 function bcl_passwordreset(WP_REST_Request $request)
 {
     $data = json_decode($request->get_body(), true);
-    if(empty($data['email'])){
+    if (empty($data['email'])) {
         $response = new WP_REST_Response(array(
             "message" => "Email parameter missing"
         ), 400);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
-    try{
+    try {
         retrieve_password($data['email']);
-    }
-    catch (Exception $e) {
+    } catch (Exception $e) {
         // Error
         $response = new WP_REST_Response(array(
-        "message" => $e->getMessage()
+            "message" => $e->getMessage()
         ), 400);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
@@ -387,32 +393,32 @@ function bcl_resetpassword(WP_REST_Request $request)
 {
     //$parameters = $request->get_params();
     $data = json_decode($request->get_body(), true);
-    if(empty($data)){
+    if (empty($data)) {
         $response = new WP_REST_Response(array(
             "message" => "Misssing Data Fields",
-            "fileds" => ['username','token','password','confirmPassword']
+            "fileds" => ['username', 'token', 'password', 'confirmPassword']
         ), 400);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
-    if( empty($data['username']) || empty($data['token']) || empty($data['password']) || empty($data['confirmPassword']) ){
+    if (empty($data['username']) || empty($data['token']) || empty($data['password']) || empty($data['confirmPassword'])) {
         $response = new WP_REST_Response(array(
             "message" => "Misssing Data Fields",
-            "fileds" => ['username','token','password','confirmPassword']
+            "fileds" => ['username', 'token', 'password', 'confirmPassword']
         ), 400);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
-    $user = check_password_reset_key($data['token'],$data['username']);
-    if(is_wp_error($user)){
+    $user = check_password_reset_key($data['token'], $data['username']);
+    if (is_wp_error($user)) {
         $response = new WP_REST_Response(array(
             "message" => $check->get_error_message(),
         ), 400);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
-    
-    if($data['password'] != $data['confirmPassword']){
+
+    if ($data['password'] != $data['confirmPassword']) {
         $response = new WP_REST_Response(array(
             "message" => 'Error Password Missmatch',
         ), 400);
@@ -420,8 +426,8 @@ function bcl_resetpassword(WP_REST_Request $request)
         return $response;
     }
 
-    reset_password( $user, $data['password'] );
-    
+    reset_password($user, $data['password']);
+
     $response = new WP_REST_Response(array(
         "message" => 'Success - Login with your new password',
     ), 200);
@@ -742,10 +748,11 @@ function bcl_content(WP_REST_Request $request)
     return $response;
 }
 
-function bcl_content_regions(WP_REST_Request $request){
+function bcl_content_regions(WP_REST_Request $request)
+{
     //$parameters = $request->get_params();
 
-    $term_query = new WP_Term_Query( array( 
+    $term_query = new WP_Term_Query(array(
         'taxonomy' => 'region',
         'orderby'                => 'name',
         'order'                  => 'ASC',
@@ -753,9 +760,9 @@ function bcl_content_regions(WP_REST_Request $request){
         'parent' => 0,
         'fields'                 => 'all',
         'hide_empty'             => true,
-    ) );
+    ));
 
-    if(is_wp_error($term_query)){
+    if (is_wp_error($term_query)) {
         $response = new WP_REST_Response($term_query->get_error_messages, 404);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
@@ -766,10 +773,11 @@ function bcl_content_regions(WP_REST_Request $request){
     return $response;
 }
 
-function bcl_content_topics(WP_REST_Request $request){
+function bcl_content_topics(WP_REST_Request $request)
+{
     // $parameters = $request->get_params();
 
-    $term_query = new WP_Term_Query( array( 
+    $term_query = new WP_Term_Query(array(
         'taxonomy' => 'bcl_topic',
         'orderby'                => 'name',
         'order'                  => 'ASC',
@@ -777,9 +785,9 @@ function bcl_content_topics(WP_REST_Request $request){
         'parent' => 0,
         'fields'                 => 'all',
         'hide_empty'             => true,
-    ) );
+    ));
 
-    if(is_wp_error($term_query)){
+    if (is_wp_error($term_query)) {
         $response = new WP_REST_Response($term_query->get_error_messages, 404);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
@@ -788,7 +796,6 @@ function bcl_content_topics(WP_REST_Request $request){
     $response = new WP_REST_Response($term_query->terms ?? [], 200);
     $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
     return $response;
-
 }
 
 function bcl_content_item_all(WP_REST_Request $request)
@@ -810,7 +817,7 @@ function bcl_content_item_all(WP_REST_Request $request)
         $args['s'] = $parameters['search'];
         $args['orderby'] = 'relevance';
     }
-    if(!empty($parameters['topics'])){
+    if (!empty($parameters['topics'])) {
         //tax_query 'relation' => 'OR',
         $args['tax_query'] = array(
             array(
@@ -843,14 +850,12 @@ function bcl_content_item_all(WP_REST_Request $request)
                 );
                 if (isset($fields['read_time'])) {
                     $data['meta']['read_time'] = $fields['read_time'];
-                }
-                else{
+                } else {
                     $data['meta']['read_time'] = 0;
                 }
-                if(isset($fields['download_links'])){
+                if (isset($fields['download_links'])) {
                     $data['meta']['download_links'] = $fields['download_links'];
-                }
-                else{
+                } else {
                     $data['meta']['download_links'] = [];
                 }
                 array_push($postData, $d);
@@ -904,7 +909,7 @@ function bcl_is_embed_domain_allowed($username)
         return true;
     }
 
-    if(in_array($host,$domains)){
+    if (in_array($host, $domains)) {
         return true;
     }
 
@@ -921,7 +926,7 @@ function bcl_content_embed(WP_REST_Request $request)
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
-    if(empty($parameters['comp'])){
+    if (empty($parameters['comp'])) {
         $response = new WP_REST_Response(array(), 404);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
@@ -938,8 +943,8 @@ function bcl_content_embed(WP_REST_Request $request)
         // array so array_merge() below can't fatal (HTTP 500).
         $fields = get_fields($post->ID);
         $fields = is_array($fields) ? $fields : array();
-        $user = get_user_by('login',$parameters['comp']);
-        if($user == false){
+        $user = get_user_by('login', $parameters['comp']);
+        if ($user == false) {
             // User Not found
             $response = new WP_REST_Response(array(), 404);
             $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
@@ -950,38 +955,41 @@ function bcl_content_embed(WP_REST_Request $request)
 
         if (!bcl_is_embed_domain_allowed($parameters['comp'] ?? '')) {
             $content = "";
-	        ob_start();
-            ?>
+            ob_start();
+    ?>
             <!doctype html>
             <html>
-                <head>
-                    <meta charset="utf-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1">
-                    <title><?php echo $post->post_title; ?></title>
-                    <script async src="https://portal.bizinkonline.com/resizer.js"></script>
-                    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-                    <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap" />
-                    <link rel="stylesheet" type="text/css" href="https://smartbizcalcs.com/css/style.css" />
-                    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-                    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
-                </head>
-                <body>
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title">Domain Not Allowed</h5>
-                            <p>Caculator not allowed on this website.</p>
-                        </div>
+
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <title><?php echo $post->post_title; ?></title>
+                <script async src="https://portal.bizinkonline.com/resizer.js"></script>
+                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+                <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800;900&display=swap" />
+                <link rel="stylesheet" type="text/css" href="https://smartbizcalcs.com/css/style.css" />
+                <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+                <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+            </head>
+
+            <body>
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Domain Not Allowed</h5>
+                        <p>Caculator not allowed on this website.</p>
                     </div>
-                    <script>
-                        window.iframeResizer = {
-                            license: "GPLv3"
-                        }
-                    </script>
-                </body>
-               </html>
-            <?php
+                </div>
+                <script>
+                    window.iframeResizer = {
+                        license: "GPLv3"
+                    }
+                </script>
+            </body>
+
+            </html>
+<?php
             $content = ob_get_contents();
-	        ob_end_clean();
+            ob_end_clean();
 
             $response = new WP_REST_Response(array(
                 "title" => $post->post_title,
@@ -993,7 +1001,7 @@ function bcl_content_embed(WP_REST_Request $request)
 
         $response = new WP_REST_Response(array(
             "title" => $post->post_title,
-            "content" => bcl_calculator_code($post,$calculator_fields),
+            "content" => bcl_calculator_code($post, $calculator_fields),
         ), 200);
 
         // Set headers.
@@ -1073,14 +1081,12 @@ function bcl_content_item(WP_REST_Request $request)
         }
         if (isset($fields['read_time'])) {
             $data['meta']['read_time'] = $fields['read_time'];
-        }
-        else{
+        } else {
             $data['meta']['read_time'] = 0;
         }
-        if(isset($fields['download_links'])){
+        if (isset($fields['download_links'])) {
             $data['meta']['download_links'] = $fields['download_links'];
-        }
-        else{
+        } else {
             $data['meta']['download_links'] = [];
         }
         if (isset($fields['file_download'])) {
@@ -1590,8 +1596,7 @@ function bcl_content_settings(WP_REST_Request $request)
         ), 200);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
-    }
-    else{
+    } else {
         // PATCH — update the current user's per-content setting overrides.
         // Stored as user meta keyed 'content_settings_{content_id}_{field_name}',
         // mirroring bcl_get_user_content_settings().
@@ -1626,6 +1631,155 @@ function bcl_content_settings(WP_REST_Request $request)
     }
 }
 
+function bcl_reshape_uploaded_files(array $files): array
+{
+    if (!isset($files['name']) || !is_array($files['name'])) {
+        return empty($files['name']) ? array() : array($files);
+    }
+
+    $reshaped = array();
+    foreach ($files['name'] as $index => $name) {
+        if ($name === '' || $name === null) {
+            continue;
+        }
+        $reshaped[] = array(
+            'name'     => $name,
+            'type'     => $files['type'][$index] ?? '',
+            'tmp_name' => $files['tmp_name'][$index] ?? '',
+            'error'    => $files['error'][$index] ?? UPLOAD_ERR_NO_FILE,
+            'size'     => $files['size'][$index] ?? 0,
+        );
+    }
+    return $reshaped;
+}
+
+function bcl_branding_request(WP_REST_Request $request)
+{
+    $method = $request->get_method();
+    if ($method === 'GET') {
+        $user_id = get_current_user_id();
+        if (!$user_id) {
+            $response = new WP_REST_Response(array("message" => "User Not Found"), 404);
+            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+            return $response;
+        }
+        if (!function_exists('get_fields') || !function_exists('update_field')) {
+            return bcl_noAcfResponce();
+        }
+
+        $parameters = $request->get_params();
+
+        $args = array(
+            'post_type'      => 'bcl_request',
+            'author'         => $user_id,
+            'post_status'    => 'any',
+            'posts_per_page' => empty($parameters['per_page']) ? 20 : $parameters['per_page'],
+            'paged'          => empty($parameters['page']) ? 1 : $parameters['page'],
+            'orderby'        => 'date',
+            'order'          => 'DESC',
+        );
+
+        $the_query = new WP_Query($args);
+
+        $requests = array();
+        if ($the_query->have_posts()) {
+            while ($the_query->have_posts()) {
+                $the_query->the_post();
+                global $post;
+                $fields = get_fields($post->ID);
+                $requests[] = array(
+                    "id"              => $post->ID,
+                    "title"           => $post->post_title,
+                    "status"          => $fields['status'] ?? '',
+                    "content_item_id" => $fields['content_item_id'] ?? array(),
+                    "notes"           => $fields['notes'] ?? '',
+                    "images"          => $fields['images'] ?? array(),
+                    "download_url"    => $fields['download_url'] ?? '',
+                    "created_date"    => $post->post_date,
+                );
+            }
+        }
+        wp_reset_postdata();
+
+        $response = new WP_REST_Response($requests, 200);
+        $response->set_headers([
+            'Cache-Control' => 'must-revalidate, no-cache, no-store, private',
+            'x-wp-total' => $the_query->found_posts,
+            'x-wp-totalpages' => $the_query->max_num_pages,
+        ]);
+        return $response;
+
+    } else {
+        $user_id = get_current_user_id();
+        if (!$user_id) {
+            $response = new WP_REST_Response(array("message" => "User Not Found"), 404);
+            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+            return $response;
+        }
+
+        if (!function_exists('get_fields') || !function_exists('update_field')) {
+            return bcl_noAcfResponce();
+        }
+
+        $params = $request->get_params();
+        $content_item_id = absint($params['content_item_id'] ?? 0);
+        if (empty($content_item_id) || !get_post($content_item_id)) {
+            $response = new WP_REST_Response(array("message" => "Invalid content item"), 400);
+            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+            return $response;
+        }
+
+        $request_note = sanitize_textarea_field($params['request_note'] ?? '');
+
+        $files = $request->get_file_params();
+        $attachments = bcl_reshape_uploaded_files($files['attachments'] ?? array());
+
+        $post_id = wp_insert_post(array(
+            'post_type'   => 'bcl_request',
+            'post_title'  => sprintf('Branding Request - %s', get_the_title($content_item_id)),
+            'post_status' => 'publish',
+            'post_author' => $user_id,
+        ), true);
+
+        if (is_wp_error($post_id)) {
+            $response = new WP_REST_Response(array("message" => "Unable to create request"), 500);
+            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+            return $response;
+        }
+
+        require_once ABSPATH . 'wp-admin/includes/file.php';
+        require_once ABSPATH . 'wp-admin/includes/image.php';
+        require_once ABSPATH . 'wp-admin/includes/media.php';
+
+        $images = array();
+        foreach ($attachments as $file) {
+            if (empty($file['tmp_name']) || !empty($file['error'])) {
+                continue;
+            }
+            $attachment_id = media_handle_sideload($file, $post_id);
+            if (!is_wp_error($attachment_id)) {
+                $images[] = array('image' => $attachment_id);
+            }
+        }
+
+        update_field('content_item_id', array($content_item_id), $post_id);
+        update_field('notes', $request_note, $post_id);
+        update_field('images', $images, $post_id);
+        update_field('status', 'pending', $post_id);
+
+        $response = new WP_REST_Response(array(
+            "message" => "Branding request submitted successfully",
+            "id"      => $post_id,
+        ), 201);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    $response = new WP_REST_Response(array("message" => "Invalid request"), 400);
+    $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+    return $response;
+}
+
 function bcl_content_allowed_domains(WP_REST_Request $request)
 {
     $user_id = get_current_user_id();
@@ -1650,8 +1804,7 @@ function bcl_content_allowed_domains(WP_REST_Request $request)
         ), 200);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
-    }
-    else if($method == 'DELETE'){
+    } else if ($method == 'DELETE') {
         $data = json_decode($request->get_body(), true);
         $url = bcl_normalize_domain(filter_var($data['domain'] ?? '', FILTER_SANITIZE_URL));
 
@@ -1662,7 +1815,7 @@ function bcl_content_allowed_domains(WP_REST_Request $request)
         }
 
         $key = array_search($url, $domains, true);
-        if($key !== false){
+        if ($key !== false) {
             array_splice($domains, $key, 1);
         }
         $domains = bcl_save_user_domains($user_id, $domains);
@@ -1673,8 +1826,7 @@ function bcl_content_allowed_domains(WP_REST_Request $request)
         ), 200);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
-    }
-    else{
+    } else {
         $data = json_decode($request->get_body(), true);
         $url = bcl_normalize_domain(filter_var($data['domain'] ?? '', FILTER_SANITIZE_URL));
 
@@ -1694,7 +1846,6 @@ function bcl_content_allowed_domains(WP_REST_Request $request)
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
-    
 }
 
 function bcl_admin_branding_queue(WP_REST_Request $request)
@@ -1716,10 +1867,9 @@ function bcl_admin_branding_queue(WP_REST_Request $request)
 function bcl_getpage(WP_REST_Request $request)
 {
     $parameters = $request->get_params();
-    if(gettype($parameters['slug']) == 'object'){
+    if (gettype($parameters['slug']) == 'object') {
         $slug = '';
-    }
-    else{
+    } else {
         $slug = sanitize_title($parameters['slug'] ?? '');
     }
 
@@ -1737,7 +1887,7 @@ function bcl_getpage(WP_REST_Request $request)
     }
 
     setup_postdata($post);
-    
+
     $data = array(
         "id"             => $post->ID,
         "title"          => $post->post_title,
@@ -1756,7 +1906,7 @@ function bcl_getpage(WP_REST_Request $request)
         $data['built_with_elementor'] = true;
         if (class_exists("\\Elementor\\Plugin")) {
             $pluginElementor = \Elementor\Plugin::instance();
-            $data['content'] = $pluginElementor->frontend->get_builder_content_for_display($post->ID,true);
+            $data['content'] = $pluginElementor->frontend->get_builder_content_for_display($post->ID, true);
             $data['settings'] = $elementor_data;
         }
     }
@@ -1827,7 +1977,7 @@ add_action('rest_api_init', function () {
         },
     ));
     register_rest_route('bcl/v1', '/firm', array(
-        'methods' => ['GET','PATCH'],
+        'methods' => ['GET', 'PATCH'],
         'callback' => 'bcl_firm',
         'permission_callback' => function () {
             return current_user_can('read');
@@ -1877,10 +2027,9 @@ add_action('rest_api_init', function () {
         'methods' => ['GET', 'POST'],
         'callback' => 'bcl_analytics',
         'permission_callback' => function (WP_REST_Request $request) {
-            if($request->get_method() == "POST"){
+            if ($request->get_method() == "POST") {
                 return true;
-            }
-            else{
+            } else {
                 return current_user_can('read');
             }
         },
@@ -1981,6 +2130,14 @@ add_action('rest_api_init', function () {
                 'sanitize_callback' => 'sanitize_text_field',
             ),
         ),
+    ));
+
+    register_rest_route('bcl/v1', '/branding-requests', array(
+        'methods' => ['GET', 'POST'],
+        'callback' => 'bcl_branding_request',
+        'permission_callback' => function () {
+            return current_user_can('read');
+        },
     ));
 });
 

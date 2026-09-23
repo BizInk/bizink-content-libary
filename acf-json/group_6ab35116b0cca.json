@@ -35,6 +35,45 @@
             "save_options": 0
         },
         {
+            "key": "field_6ab35a9b4f349",
+            "label": "Content",
+            "name": "content_item_id",
+            "aria-label": "",
+            "type": "relationship",
+            "instructions": "",
+            "required": 0,
+            "conditional_logic": 0,
+            "wrapper": {
+                "width": "",
+                "class": "",
+                "id": ""
+            },
+            "post_type": [
+                "elementor_library",
+                "bcl_pdf",
+                "bcl_excel",
+                "bcl_tool",
+                "bcl_ebook",
+                "bcl_article"
+            ],
+            "post_status": [
+                "publish"
+            ],
+            "taxonomy": "",
+            "filters": [
+                "search",
+                "post_type",
+                "taxonomy"
+            ],
+            "return_format": "id",
+            "min": "",
+            "max": "",
+            "allow_in_bindings": 0,
+            "elements": "",
+            "bidirectional": 0,
+            "bidirectional_target": []
+        },
+        {
             "key": "field_6ab3547352075",
             "label": "Client Notes",
             "name": "notes",
@@ -146,5 +185,5 @@
     "display_title": "",
     "allow_ai_access": false,
     "ai_description": "",
-    "modified": 1790137857
+    "modified": 1790139099
 }
