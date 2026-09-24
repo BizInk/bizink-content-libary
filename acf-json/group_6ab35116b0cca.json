@@ -20,7 +20,7 @@
                 "pending": "Pending",
                 "processing": "Processing",
                 "done": "Done",
-                "canceled": "Canceled",
+                "cancelled": "Cancelled",
                 "clientResponse": "Client Response",
                 "adminResponse": "Admin Response"
             },
@@ -179,5 +179,5 @@
     "display_title": "",
     "allow_ai_access": false,
     "ai_description": "",
-    "modified": 1790148472
+    "modified": 1790149472
 }

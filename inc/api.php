@@ -283,6 +283,9 @@ function bcl_calculator_code(WP_POST $post, array $fields)
                     availableCash: 100000,
                     monthlyExpense: 30000,
                     monthlyIncome: 25000,
+                    loanAmount: 250000,
+			        interestRate: 6,
+			        loanTermYears: 5,
                 },
                 Intro: '<?php echo isset($fields['intro']) ? $fields['intro'] : 'Estimate how many units you need to sell to cover your overheads and achieve a target profit over a set time period.' ?>',
                 tab2Text: 'TestTab2Text',
@@ -330,6 +333,11 @@ function bcl_calculator_code(WP_POST $post, array $fields)
                     },
                 },
             }, ];
+            
+            window.calculatorTabDefaults = {
+
+            };
+            // window.calculatorCoachDefaults = {};
         </script>
         <?php
         echo $fields['head_code'] ?? '';
@@ -1022,7 +1030,17 @@ function bcl_get_user_content_settings($user_id, $content_id)
     $prefix = 'content_settings_' . $content_id . '_';
     $prefix_len = strlen($prefix);
 
-    $settings = array();
+    $settings = array(
+        'currencyCode' => 'NZD',
+        'labels' => [],
+        'defaultValues' => [],
+    );
+    if(function_exists('get_fields')){
+        $fields = get_fields($content_id);
+        $settings['labels'] = $fields['lables'] ?? [];
+        $settings['defaultValues'] = $fields['defaultValues'] ?? [];
+    }
+
     foreach (get_user_meta($user_id) as $meta_key => $meta_value) {
         if (strncmp($meta_key, $prefix, $prefix_len) === 0) {
             $field_name = substr($meta_key, $prefix_len);
@@ -1071,7 +1089,9 @@ function bcl_content_item(WP_REST_Request $request)
             "user_settings" => $user_settings,
             "meta" => array(
                 "content_type" => $post->post_type,
-                "allowed_domains" => $domains ?? []
+                "allowed_domains" => $domains ?? [],
+                "labels" => $fields['labels'] ?? [],
+                'defaultValues' => $fields['defaultValues'] ?? []
             )
         );
         if (isset($fields['enable_whats_inside_items']) && ($fields['enable_whats_inside_items'] == true || $fields['enable_whats_inside_items'] == 'yes')) {
@@ -1653,17 +1673,6 @@ function bcl_reshape_uploaded_files(array $files): array
     return $reshaped;
 }
 
-function bcl_branding_request_content_id($content_item_id)
-{
-    if ($content_item_id instanceof WP_Post) {
-        return $content_item_id->ID;
-    }
-    if (is_numeric($content_item_id)) {
-        return (int) $content_item_id;
-    }
-    return null;
-}
-
 function bcl_branding_request(WP_REST_Request $request)
 {
     $method = $request->get_method();
@@ -1702,7 +1711,7 @@ function bcl_branding_request(WP_REST_Request $request)
                     "id"              => $post->ID,
                     "title"           => $post->post_title,
                     "status"          => $fields['status'] ?? '',
-                    "content_item_id" => bcl_branding_request_content_id($fields['content_item_id'] ?? null),
+                    "content_item_id" => $fields['content_item_id'],
                     "notes"           => $fields['notes'] ?? '',
                     "images"          => $fields['images'] ?? array(),
                     "download_url"    => $fields['download_url'] ?? '',
@@ -1822,7 +1831,7 @@ function bcl_branding_request_update(WP_REST_Request $request)
             "id"              => $post->ID,
             "title"           => $post->post_title,
             "status"          => $fields['status'] ?? '',
-            "content_item_id" => bcl_branding_request_content_id($fields['content_item_id'] ?? null),
+            "content_item_id" => $fields['content_item_id'],
             "notes"           => $fields['notes'] ?? '',
             "images"          => $fields['images'] ?? array(),
             "download_url"    => $fields['download_url'] ?? '',
@@ -1844,12 +1853,12 @@ function bcl_branding_request_update(WP_REST_Request $request)
     if (isset($params['status'])) {
         $current_status = get_field('status', $post->ID);
         // Clients may only cancel their own request, and only before it has been completed.
-        if ($params['status'] !== 'canceled' || in_array($current_status, array('done', 'canceled'), true)) {
+        if (($params['status'] !== 'cancelled' && $params['status'] !== 'pending') || in_array($current_status, array('done', 'processing'), true)) {
             $response = new WP_REST_Response(array("message" => "Invalid status"), 400);
             $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
             return $response;
         }
-        update_field('status', 'canceled', $post->ID);
+        update_field('status', $params['status'], $post->ID);
         $updated = true;
     }
 
@@ -1890,7 +1899,7 @@ function bcl_branding_request_update(WP_REST_Request $request)
         "id"              => $post->ID,
         "title"           => $post->post_title,
         "status"          => $fields['status'] ?? '',
-        "content_item_id" => bcl_branding_request_content_id($fields['content_item_id'] ?? null),
+        "content_item_id" => $fields['content_item_id'],
         "notes"           => $fields['notes'] ?? '',
         "images"          => $fields['images'] ?? array(),
         "download_url"    => $fields['download_url'] ?? '',

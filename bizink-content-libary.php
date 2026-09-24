@@ -142,6 +142,42 @@ function bcl_request_render_column(string $column, int $post_id): void {
 }
 add_action('manage_bcl_request_posts_custom_column', __NAMESPACE__ . '\\bcl_request_render_column', 10, 2);
 
+/**
+ * Show a count bubble on the Custom Requests admin menu item for requests
+ * that are waiting on an admin (status "pending" or "clientResponse").
+ */
+function bcl_request_menu_bubble(): void {
+    global $menu;
+
+    $query = new \WP_Query([
+        'post_type'      => 'bcl_request',
+        'post_status'    => ['publish', 'draft', 'pending', 'private', 'future'],
+        'posts_per_page' => 1,
+        'fields'         => 'ids',
+        'no_found_rows'  => false,
+        'meta_query'     => [[
+            'key'     => 'status',
+            'value'   => ['pending', 'clientResponse'],
+            'compare' => 'IN',
+        ]],
+    ]);
+    $count = (int) $query->found_posts;
+    if ($count < 1) {
+        return;
+    }
+
+    foreach ($menu as $key => $item) {
+        if ($item[2] === 'edit.php?post_type=bcl_request') {
+            $menu[$key][0] .= sprintf(
+                ' <span class="awaiting-mod count-%1$d"><span class="pending-count">%1$d</span></span>',
+                $count
+            );
+            break;
+        }
+    }
+}
+add_action('admin_menu', __NAMESPACE__ . '\\bcl_request_menu_bubble', 999);
+
 // Portal Email
 function bcl_new_user_email($message,  $user, $blogname){
 
