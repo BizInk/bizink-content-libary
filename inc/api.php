@@ -95,9 +95,12 @@ function bcl_calculator_code(WP_POST $post, array $fields)
         <link rel="stylesheet" type="text/css" href="https://smartbizcalcs.com/css/style.css" />
         <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
-
+        <script src="https://cdn.jsdelivr.net/npm/chart.js" type="text/javascript"></script>
         <style>
             /** brand.css */
+            .bizinkEmbed {
+            	padding: 2rem;
+            }
             .bizinkEmbed .TSBCcontainer {
                 border: solid 1px var(--brand-tab-border-color);
             }
@@ -188,15 +191,10 @@ function bcl_calculator_code(WP_POST $post, array $fields)
 
                 /* chart colors */
                 --brand-chart-primary: <?php echo $fields['chart-primary'] ?? '#036'; ?> !important;
-                /* primary series / savings growth */
                 --brand-chart-secondary: <?php echo $fields['chart-secondary'] ?? '#377dff'; ?> !important;
-                /* secondary bar (e.g. wants) */
                 --brand-chart-tertiary: <?php echo $fields['chart-tertiary'] ?? '#4caf50'; ?> !important;
-                /* tertiary bar (e.g. savings) */
                 --brand-chart-line: <?php echo $fields['chart-line'] ?? '#001871'; ?> !important;
-                /* default line color for projections */
                 --brand-chart-danger: <?php echo $fields['chart-danger'] ?? '#377dff'; ?> !important;
-                /* warning/loan/debt color */
 
                 /* sliders */
                 --brand-slider-track-color: <?php echo $fields['slider-track-color'] ?? '#d0d4e5'; ?> !important;
@@ -292,9 +290,7 @@ function bcl_calculator_code(WP_POST $post, array $fields)
                 tab3Text: 'TestTab3Text',
                 tab4Text: 'TestTab4Text',
                 resultIntro: '',
-                // Optional CTA buttons (below resultIntro)
-                //callToActionButton1: { text: 'Apply now', link: '#' },
-                // callToActionButton2: { text: 'Learn more', link: '#' },
+
                 singleColumnLayout: <?php if (isset($fields['singlecolumnlayout']) && $fields['singlecolumnlayout']): echo "true";
                                     else: echo "false";
                                     endif; ?>,
@@ -335,7 +331,9 @@ function bcl_calculator_code(WP_POST $post, array $fields)
             }, ];
             
             window.calculatorTabDefaults = {
-
+                tab2Text: content.tab2Text,
+                tab3Text: content.tab3Text,
+                tab4Text: content.tab4Text
             };
             // window.calculatorCoachDefaults = {};
         </script>
@@ -1561,11 +1559,11 @@ function bcl_analytics(WP_REST_Request $request)
     $response = new WP_REST_Response(array(
         "content_id"      => $content_id,
         "total_events"    => $total_events,
-        "events"          => $totals,
-        "caculations"      => $totals && $totals['caculate'] !== null ? $totals['caculate'] : 0,
-        "views"            => $totals && $totals['view'] !== null ? $totals['view'] : 0,
-        "total_engagement" => $engagement && $engagement->total !== null ? round((float) $engagement->total, 2) : 0,
-        "avg_engagement"   => $engagement && $engagement->average !== null ? round((float) $engagement->average, 2) : 0,
+        "calculations"     => isset($totals['caculate']) ? $totals['caculate'] : 0,
+        "views"            => isset($totals['view']) ? $totals['view'] : 0,
+        "aicopy"           => isset($totals['aicopy']) ? $totals['aicopy'] : 0, 
+        "total_engagement" => isset($engagement->total) ? round((float) $engagement->total, 2) : 0,
+        "avg_engagement"   => isset($engagement->average) ? round((float) $engagement->average, 2) : 0,
     ), 200);
 
     // Set headers.
@@ -1980,17 +1978,39 @@ function bcl_content_allowed_domains(WP_REST_Request $request)
 
 function bcl_admin_branding_queue(WP_REST_Request $request)
 {
-    $parameters = $request->get_url_params();
-    if (empty($parameters['id'])) {
-        $response = new WP_REST_Response(array(), 404);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
+    if (!function_exists('get_fields')) {
+        return bcl_noAcfResponce();
     }
-    $response = new WP_REST_Response(array(), 200);
 
-    // Set headers.
+    $query = new WP_Query(array(
+        'post_type'      => 'bcl_request',
+        'posts_per_page' => -1,
+        'orderby'        => 'date',
+        'order'          => 'ASC',
+        'meta_query'     => array(array(
+            'key'     => 'status',
+            'value'   => array('pending', 'clientResponse', 'adminResponse', 'processing'),
+            'compare' => 'IN',
+        )),
+    ));
+
+    $requests = array();
+    foreach ($query->posts as $post) {
+        $fields = get_fields($post->ID);
+        $requests[] = array(
+            "id"              => $post->ID,
+            "title"           => $post->post_title,
+            "status"          => $fields['status'] ?? '',
+            "content_item_id" => $fields['content_item_id'] ?? 0,
+            "notes"           => $fields['notes'] ?? '',
+            "images"          => $fields['images'] ?? array(),
+            "user_id"         => (int) $post->post_author,
+            "created_date"    => $post->post_date,
+        );
+    }
+
+    $response = new WP_REST_Response($requests, 200);
     $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-
     return $response;
 }
 
