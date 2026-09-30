@@ -99,8 +99,9 @@ function bcl_calculator_code(WP_POST $post, array $fields)
         <style>
             /** brand.css */
             .bizinkEmbed {
-            	padding: 2rem;
+                padding: 2rem;
             }
+
             .bizinkEmbed .TSBCcontainer {
                 border: solid 1px var(--brand-tab-border-color);
             }
@@ -282,8 +283,8 @@ function bcl_calculator_code(WP_POST $post, array $fields)
                     monthlyExpense: 30000,
                     monthlyIncome: 25000,
                     loanAmount: 250000,
-			        interestRate: 6,
-			        loanTermYears: 5,
+                    interestRate: 6,
+                    loanTermYears: 5,
                 },
                 Intro: '<?php echo isset($fields['intro']) ? $fields['intro'] : 'Estimate how many units you need to sell to cover your overheads and achieve a target profit over a set time period.' ?>',
                 tab2Text: 'TestTab2Text',
@@ -329,7 +330,7 @@ function bcl_calculator_code(WP_POST $post, array $fields)
                     },
                 },
             }, ];
-            
+
             window.calculatorTabDefaults = {
                 tab2Text: content.tab2Text,
                 tab3Text: content.tab3Text,
@@ -458,11 +459,24 @@ function bcl_register(WP_REST_Request $request)
     $email       = sanitize_email($data['email'] ?? '');
     $password    = $data['password'] ?? '';
 
+    $card_name   = sanitize_text_field($data['card_name'] ?? '');
+    $payment_method_id   = sanitize_text_field($data['payment_method_id'] ?? '');
+    $plan     = $data['plan'] ?? '';
+    $level_id = absint($plan);
+    $interval = ($data['interval'] ?? 'month') === 'year' ? 'year' : 'month';
+    $currency = strtoupper(sanitize_text_field($data['currency'] ?? ''));
+
     $missing = array();
     if (empty($first_name))  $missing[] = 'first_name';
     if (empty($last_name))   $missing[] = 'last_name';
     if (empty($email))       $missing[] = 'email';
     if (empty($password))    $missing[] = 'password';
+
+    // A plan means this is a paid signup: card and currency must come with it.
+    if ($level_id) {
+        if (empty($payment_method_id)) $missing[] = 'payment_method_id';
+        if (empty($currency))          $missing[] = 'currency';
+    }
 
     if (!empty($missing)) {
         $response = new WP_REST_Response(array(
@@ -488,6 +502,25 @@ function bcl_register(WP_REST_Request $request)
         return $response;
     }
 
+    $level = null;
+    $price = null;
+    if ($level_id) {
+        if (empty(bcl_stripe_option('secret_key'))) {
+            return bcl_stripe_error_response('Stripe is not configured', 500);
+        }
+        if (!in_array($currency, bcl_stripe_enabled_currencies(), true)) {
+            return bcl_stripe_error_response('Currency not enabled', 400);
+        }
+        $level = get_post($level_id);
+        if (!$level || $level->post_type !== 'bcl_member_level' || $level->post_status !== 'publish') {
+            return bcl_stripe_error_response('Invalid plan', 400);
+        }
+        $price = bcl_member_level_price($level_id, $interval, $currency);
+        if ($price === null || $price <= 0) {
+            return bcl_stripe_error_response('This plan has no price set for that currency', 400);
+        }
+    }
+
     $base_username = sanitize_user(strtolower($first_name . '.' . $last_name), true);
     $username = $base_username;
     $i = 1;
@@ -510,6 +543,21 @@ function bcl_register(WP_REST_Request $request)
         'last_name'  => $last_name,
     ));
     update_user_meta($user_id, 'firm_name', $firm_name);
+    update_user_meta($user_id, 'payment_method_id', $payment_method_id);
+    update_user_meta($user_id, 'card_name', $card_name);
+    update_user_meta($user_id, 'plan', $plan);
+
+    if ($level_id) {
+        $error = bcl_register_process_payment($user_id, $level_id, $interval, $currency, $price, $payment_method_id);
+        if (is_wp_error($error)) {
+            require_once ABSPATH . 'wp-admin/includes/user.php';
+            wp_delete_user($user_id);
+
+            $response = new WP_REST_Response(array("message" => $error->get_error_message()), 402);
+            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+            return $response;
+        }
+    }
 
     $response = new WP_REST_Response(array(
         "message" => "User created successfully",
@@ -519,229 +567,80 @@ function bcl_register(WP_REST_Request $request)
     return $response;
 }
 
-function bcl_subscribe(WP_REST_Request $request)
+/**
+ * Create the Stripe customer for a newly-registered member, attach their
+ * card, and start the subscription for the plan they signed up for.
+ *
+ * @return true|WP_Error True on success; WP_Error (and nothing charged) on
+ *                        any failure, so the caller can roll the signup back.
+ */
+function bcl_register_process_payment($user_id, $level_id, $interval, $currency, $price, $payment_method_id)
 {
-    $data = json_decode($request->get_body(), true);
-
-    if (!is_array($data)) {
-        $response = new WP_REST_Response(array("message" => "Invalid or empty request body"), 400);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
+    $customer_id = bcl_stripe_get_or_create_customer($user_id);
+    if (is_wp_error($customer_id)) {
+        return $customer_id;
     }
 
-    $user_id            = absint($data['user_id'] ?? 0);
-    $plan               = absint($data['plan'] ?? 0);
-    $card_name          = sanitize_text_field($data['card_name'] ?? '');
-    $payment_method_id  = sanitize_text_field($data['payment_method_id'] ?? '');
-
-    $missing = array();
-    if (empty($user_id))           $missing[] = 'user_id';
-    if (empty($plan))              $missing[] = 'plan';
-    if (empty($card_name))         $missing[] = 'card_name';
-    if (empty($payment_method_id)) $missing[] = 'payment_method_id';
-
-    if (!empty($missing)) {
-        $response = new WP_REST_Response(array(
-            "message" => "Missing required fields: " . implode(', ', $missing),
-            "fields"  => $missing
-        ), 400);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
+    $product_id = bcl_stripe_product_id_for_level($level_id);
+    if (is_wp_error($product_id)) {
+        return $product_id;
     }
 
-    if (!get_userdata($user_id)) {
-        $response = new WP_REST_Response(array(
-            "message" => "User not found",
-            "fields"  => array('user_id')
-        ), 404);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
+    $attached = bcl_stripe_request('POST', 'payment_methods/' . $payment_method_id . '/attach', array(
+        'customer' => $customer_id,
+    ));
+    if (is_wp_error($attached)) {
+        return $attached;
     }
 
-    if (!function_exists('pmpro_getLevel') || !class_exists('MemberOrder')) {
-        $response = new WP_REST_Response(array("message" => "Paid Memberships Pro not active"), 500);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
+    $updated_customer = bcl_stripe_request('POST', 'customers/' . $customer_id, array(
+        'invoice_settings' => array('default_payment_method' => $payment_method_id),
+    ));
+    if (is_wp_error($updated_customer)) {
+        return $updated_customer;
     }
 
-    // This endpoint charges the PaymentMethod directly (PMPro's "onsite" Stripe flow).
-    // When the site is set to Stripe Checkout instead, MemberOrder::process() redirects
-    // and exits rather than returning, which would kill this REST request. Bail out with
-    // a clear error instead of letting that happen; use /bcl/v1/checkout-session there.
-    if (class_exists('PMProGateway_stripe') && PMProGateway_stripe::using_stripe_checkout()) {
-        $response = new WP_REST_Response(array(
-            "message" => "This site is configured for Stripe Checkout; use the checkout session endpoint instead of /bcl/v1/subscribe"
-        ), 400);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
+    $params = array(
+        'customer'                => $customer_id,
+        'default_payment_method'  => $payment_method_id,
+        'items'                   => array(
+            array(
+                'price_data' => array(
+                    'currency'    => strtolower($currency),
+                    'unit_amount' => (int) round($price * 100),
+                    'recurring'   => array('interval' => $interval),
+                    'product'     => $product_id,
+                ),
+            ),
+        ),
+        'metadata'                => array(
+            'wp_user_id'      => $user_id,
+            'member_level_id' => $level_id,
+        ),
+        'expand'                  => array('default_payment_method', 'latest_invoice.payment_intent'),
+    );
+
+    $upfront_price = bcl_member_level_price($level_id, $interval, $currency, true);
+    if ($upfront_price !== null && $upfront_price > 0) {
+        $params['add_invoice_items'] = array(
+            array(
+                'price_data' => array(
+                    'currency'    => strtolower($currency),
+                    'unit_amount' => (int) round($upfront_price * 100),
+                    'product'     => $product_id,
+                ),
+            ),
+        );
     }
 
-    global $pmpro_level;
-    $pmpro_level = pmpro_getLevel($plan);
-
-    if (empty($pmpro_level)) {
-        $response = new WP_REST_Response(array(
-            "message" => "Invalid membership plan",
-            "fields"  => array('plan')
-        ), 400);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
+    $subscription = bcl_stripe_request('POST', 'subscriptions', $params);
+    if (is_wp_error($subscription)) {
+        return $subscription;
     }
 
-    try {
-        $order = new MemberOrder();
-        $order->membership_id    = $plan;
-        $order->membership_name  = $pmpro_level->name;
-        $order->membership_level = $pmpro_level;
-        $order->user_id          = $user_id;
-        $order->status = "pending";
-        $order->setGateway('stripe');
+    bcl_stripe_store_subscription($user_id, $subscription);
 
-        // Stripe requires a PaymentMethod created client-side (via Stripe.js/Elements)
-        // rather than raw card details — the gateway looks this up by ID.
-        $order->cardholdername   = $card_name;
-        $order->payment_method_id = $payment_method_id;
-
-        $order->billing        = new stdClass();
-        $order->billing->name  = $card_name;
-
-        $order->subtotal = $pmpro_level->initial_payment;
-        $order->tax = 0;
-        $order->total = $pmpro_level->initial_payment;
-
-        if (!$order->process()) {
-            $response = new WP_REST_Response(array("message" => $order->error ?: "Payment processing failed"), 402);
-            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-            return $response;
-        }
-
-        if (!pmpro_complete_checkout($order)) {
-            // The charge succeeded but we couldn't assign the membership level.
-            // Try to cancel the payment so the member isn't charged for nothing.
-            $order->cancel();
-            $response = new WP_REST_Response(array("message" => "Payment succeeded but membership could not be assigned; the charge was cancelled"), 500);
-            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-            return $response;
-        }
-    } catch (Throwable $e) {
-        $response = new WP_REST_Response(array("message" => "Payment error: " . $e->getMessage()), 402);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
-    }
-
-    $response = new WP_REST_Response(array(
-        "message" => "Subscription processed successfully",
-        "user_id" => $user_id
-    ), 201);
-    $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-    return $response;
-}
-
-function bcl_checkout_session(WP_REST_Request $request)
-{
-    $data = json_decode($request->get_body(), true);
-
-    if (!is_array($data)) {
-        $response = new WP_REST_Response(array("message" => "Invalid or empty request body"), 400);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
-    }
-
-    $user_id = absint($data['user_id'] ?? 0);
-    $plan    = absint($data['plan'] ?? 0);
-
-    $missing = array();
-    if (empty($user_id)) $missing[] = 'user_id';
-    if (empty($plan))    $missing[] = 'plan';
-
-    if (!empty($missing)) {
-        $response = new WP_REST_Response(array(
-            "message" => "Missing required fields: " . implode(', ', $missing),
-            "fields"  => $missing
-        ), 400);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
-    }
-
-    if (!get_userdata($user_id)) {
-        $response = new WP_REST_Response(array(
-            "message" => "User not found",
-            "fields"  => array('user_id')
-        ), 404);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
-    }
-
-    if (!function_exists('pmpro_getLevel') || !class_exists('PMProGateway_stripe')) {
-        $response = new WP_REST_Response(array("message" => "Paid Memberships Pro Stripe gateway not active"), 500);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
-    }
-
-    global $pmpro_level;
-    $pmpro_level = pmpro_getLevel($plan);
-
-    if (empty($pmpro_level)) {
-        $response = new WP_REST_Response(array(
-            "message" => "Invalid membership plan",
-            "fields"  => array('plan')
-        ), 400);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
-    }
-
-    $order = new MemberOrder();
-    $order->membership_id = $plan;
-    $order->user_id       = $user_id;
-    $order->setGateway('stripe');
-
-    // PMProGateway_stripe::pmpro_checkout_before_change_membership_level() builds the
-    // Stripe Checkout Session params correctly (price/tax/trial handling) but always
-    // finishes with wp_redirect($session->url); exit — no way to get the session back
-    // as data. So we hook the filter it applies just before calling Session::create(),
-    // capture the params, and throw to bail out before the redirect/exit happens.
-    $captured_params = null;
-    $capture = function ($params) use (&$captured_params) {
-        $captured_params = $params;
-        throw new Exception('bcl_checkout_session_capture');
-    };
-
-    add_filter('pmpro_stripe_checkout_session_parameters', $capture, PHP_INT_MAX);
-    try {
-        PMProGateway_stripe::pmpro_checkout_before_change_membership_level($user_id, $order);
-    } catch (Throwable $e) {
-        if ($e->getMessage() !== 'bcl_checkout_session_capture') {
-            remove_filter('pmpro_stripe_checkout_session_parameters', $capture, PHP_INT_MAX);
-            $response = new WP_REST_Response(array("message" => "Could not start checkout: " . $e->getMessage()), 500);
-            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-            return $response;
-        }
-    }
-    remove_filter('pmpro_stripe_checkout_session_parameters', $capture, PHP_INT_MAX);
-
-    if (empty($captured_params)) {
-        $response = new WP_REST_Response(array("message" => "Could not create checkout session"), 500);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
-    }
-
-    try {
-        $session = \Stripe\Checkout\Session::create($captured_params);
-    } catch (Throwable $e) {
-        $response = new WP_REST_Response(array("message" => "Stripe error: " . $e->getMessage()), 502);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
-    }
-
-    update_pmpro_membership_order_meta($order->id, 'stripe_checkout_session_id', $session->id);
-
-    $response = new WP_REST_Response(array(
-        "order_id"            => $order->id,
-        "checkout_session_id" => $session->id,
-        "checkout_url"        => $session->url,
-    ), 201);
-    $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-    return $response;
+    return true;
 }
 
 function bcl_content(WP_REST_Request $request)
@@ -1033,7 +932,7 @@ function bcl_get_user_content_settings($user_id, $content_id)
         'labels' => [],
         'defaultValues' => [],
     );
-    if(function_exists('get_fields')){
+    if (function_exists('get_fields')) {
         $fields = get_fields($content_id);
         $settings['labels'] = $fields['lables'] ?? [];
         $settings['defaultValues'] = $fields['defaultValues'] ?? [];
@@ -1213,7 +1112,83 @@ function bcl_firm(WP_REST_Request $request)
 
 function bcl_firm_subscription(WP_REST_Request $request)
 {
-    $response = new WP_REST_Response(array(), 200);
+    $user_id = get_current_user_id();
+    if (!$user_id) {
+        return bcl_stripe_error_response('User Not Found', 404);
+    }
+
+    $method = $request->get_method();
+
+    // POST/PATCH — update the payment method used for this member's subscription.
+    // The PaymentMethod is created client-side via Stripe.js/Elements using the
+    // publishable key from /bcl/v1/stripe-config; only its ID is sent here.
+    if ($method === 'POST' || $method === 'PATCH' || $method === 'PUT') {
+        $data = json_decode($request->get_body(), true);
+        $payment_method_id = sanitize_text_field($data['payment_method_id'] ?? '');
+
+        if (empty($payment_method_id)) {
+            return bcl_stripe_error_response('Missing required field: payment_method_id', 400);
+        }
+
+        $customer_id = get_user_meta($user_id, 'bcl_stripe_customer_id', true);
+        if (empty($customer_id)) {
+            return bcl_stripe_error_response('No Stripe customer found for this user', 404);
+        }
+
+        $attached = bcl_stripe_request('POST', 'payment_methods/' . $payment_method_id . '/attach', array(
+            'customer' => $customer_id,
+        ));
+        if (is_wp_error($attached)) {
+            return bcl_stripe_error_response($attached->get_error_message(), 402);
+        }
+
+        $updated_customer = bcl_stripe_request('POST', 'customers/' . $customer_id, array(
+            'invoice_settings' => array('default_payment_method' => $payment_method_id),
+        ));
+        if (is_wp_error($updated_customer)) {
+            return bcl_stripe_error_response($updated_customer->get_error_message(), 502);
+        }
+
+        $subscription_id = get_user_meta($user_id, 'bcl_stripe_subscription_id', true);
+        if (!empty($subscription_id)) {
+            bcl_stripe_request('POST', 'subscriptions/' . $subscription_id, array(
+                'default_payment_method' => $payment_method_id,
+            ));
+        }
+
+        if (!empty($attached['card'])) {
+            bcl_stripe_store_card($user_id, $attached['card']);
+        }
+    }
+
+    // Refresh from Stripe so this always reflects the true state, even if a
+    // webhook was missed.
+    $subscription_id = get_user_meta($user_id, 'bcl_stripe_subscription_id', true);
+    if (!empty($subscription_id) && !empty(bcl_stripe_option('secret_key'))) {
+        bcl_stripe_sync_subscription($user_id, $subscription_id);
+    }
+
+    $level_id   = (int) get_user_meta($user_id, 'bcl_stripe_member_level_id', true);
+    $period_end = (int) get_user_meta($user_id, 'bcl_stripe_current_period_end', true);
+    $exp_month  = get_user_meta($user_id, 'bcl_stripe_card_exp_month', true);
+    $exp_year   = get_user_meta($user_id, 'bcl_stripe_card_exp_year', true);
+
+    $response = new WP_REST_Response(array(
+        "has_subscription"     => !empty($subscription_id),
+        "status"               => get_user_meta($user_id, 'bcl_stripe_subscription_status', true) ?: null,
+        "member_level_id"      => $level_id ?: null,
+        "member_level_name"    => $level_id ? get_the_title($level_id) : null,
+        "billing_interval"     => get_user_meta($user_id, 'bcl_stripe_billing_interval', true) ?: null,
+        "currency"             => get_user_meta($user_id, 'bcl_stripe_currency', true) ?: null,
+        "current_period_end"   => $period_end ?: null,
+        "cancel_at_period_end" => (bool) get_user_meta($user_id, 'bcl_stripe_cancel_at_period_end', true),
+        "card" => array(
+            "brand"     => get_user_meta($user_id, 'bcl_stripe_card_brand', true) ?: null,
+            "last4"     => get_user_meta($user_id, 'bcl_stripe_card_last4', true) ?: null,
+            "exp_month" => $exp_month !== '' ? (int) $exp_month : null,
+            "exp_year"  => $exp_year !== '' ? (int) $exp_year : null,
+        ),
+    ), 200);
 
     // Set headers.
     $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
@@ -1561,7 +1536,7 @@ function bcl_analytics(WP_REST_Request $request)
         "total_events"    => $total_events,
         "calculations"     => isset($totals['caculate']) ? $totals['caculate'] : 0,
         "views"            => isset($totals['view']) ? $totals['view'] : 0,
-        "aicopy"           => isset($totals['aicopy']) ? $totals['aicopy'] : 0, 
+        "aicopy"           => isset($totals['aicopy']) ? $totals['aicopy'] : 0,
         "total_engagement" => isset($engagement->total) ? round((float) $engagement->total, 2) : 0,
         "avg_engagement"   => isset($engagement->average) ? round((float) $engagement->average, 2) : 0,
     ), 200);
@@ -1726,7 +1701,6 @@ function bcl_branding_request(WP_REST_Request $request)
             'x-wp-totalpages' => $the_query->max_num_pages,
         ]);
         return $response;
-
     } else {
         $user_id = get_current_user_id();
         if (!$user_id) {
@@ -2085,7 +2059,7 @@ add_action('rest_api_init', function () {
         },
     ));
     register_rest_route('bcl/v1', '/firm/subscription', array(
-        'methods' => 'GET',
+        'methods' => array('GET', 'POST', 'PATCH'),
         'callback' => 'bcl_firm_subscription',
         'permission_callback' => function () {
             return current_user_can('read');
@@ -2238,14 +2212,6 @@ add_action('rest_api_init', function () {
         'permission_callback' => '__return_true'
     ));
 
-    register_rest_route('bcl/v1', '/subscribe', array(
-        'methods' => 'POST',
-        'callback' => 'bcl_subscribe',
-        'permission_callback' => function () {
-            return current_user_can('read');
-        },
-    ));
-
     register_rest_route('bcl/v1', '/page', array(
         'methods' => 'GET',
         'callback' => 'bcl_getpage',
@@ -2301,91 +2267,24 @@ add_action('rest_api_init', function () {
 
 function bcl_getcurencies(WP_REST_Request $request)
 {
-    if (function_exists('lmf_build_currency_items')) {
-        $currency = lmf_build_currency_items();
-        $response = new WP_REST_Response($currency, 200);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
-    } else {
-
-        $currency = json_decode('[
-    {
-        "code": "USD",
-        "label": "USD ($)",
-        "active": false
-    },
-    {
-        "code": "EUR",
-        "label": "EUR (\u20ac)",
-        "active": false
-    },
-    {
-        "code": "GBP",
-        "label": "GBP (\u00a3)",
-        "active": false
-    },
-    {
-        "code": "AUD",
-        "label": "AUD ($)",
-        "active": false
-    },
-    {
-        "code": "CAD",
-        "label": "CAD ($)",
-        "active": false
-    },
-    {
-        "code": "NZD",
-        "label": "NZD ($)",
-        "active": true
-    }
-]');
-        $response = new WP_REST_Response($currency, 200);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
-    }
-}
-
-function bcl_getpackeges(WP_REST_Request $request)
-{
-    if (!function_exists('pmpro_getAllLevels')) {
-        $response = new WP_REST_Response(array("message" => "Paid Memberships Pro not active"), 500);
-        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
-        return $response;
-    }
-
-    $levels = pmpro_getAllLevels(false, true);
-    // get_pmpro_membership_level_meta
-    $packages = array_values(array_map(function ($level) {
-        $currency = "NZD";
-        $symbol = "$";
-        if (function_exists('get_pmpro_membership_level_meta')) {
-            $data = get_pmpro_membership_level_meta($level->id, 'pmpro_custom_currency', true);
-            $parts = explode(',', $data);
-            $currency = $parts[0];
-            $symbol = $parts[1];
-            if ($currency == "DEFAULT") {
-                $currency = 'NZD';
-                $symbol = "$";
-            }
-        }
-
-        return array(
-            'id'             => (int) $level->id,
-            'name'           => $level->name,
-            'description'    => $level->description,
-            'price' => (float) $level->billing_amount,
-            'cycle_number'   => (int) $level->cycle_number,
-            'cycle_period'   => $level->cycle_period,
-            'initial_payment' => $level->initial_payment,
-            'currency' => $currency,
-            'symbol' => $symbol
+    $enabled  = bcl_stripe_enabled_currencies();
+    $currency = array();
+    foreach (BCL_STRIPE_CURRENCIES as $code => $meta) {
+        $currency[] = array(
+            'code'   => $code,
+            'label'  => $meta['label'],
+            'active' => in_array($code, $enabled, true),
         );
-    }, $levels));
-
-    $response = new WP_REST_Response($packages, 200);
+    }
+    $response = new WP_REST_Response($currency, 200);
     $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
     return $response;
+}
+
+// Kept as an alias of /member-levels for backwards compatibility with existing frontend code.
+function bcl_getpackeges(WP_REST_Request $request)
+{
+    return bcl_member_levels($request);
 }
 
 function bcl_getmenu(WP_REST_Request $request)

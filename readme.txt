@@ -23,6 +23,7 @@ Bizink Portal
 * Search Fixed
 * Topics
 * Content Requests
+* Process Stripe Payments
 
 = 0.1.8 =
 * Labels Config

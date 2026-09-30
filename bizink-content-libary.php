@@ -14,6 +14,8 @@ defined('ABSPATH') || exit;
 
 require_once __DIR__ . '/inc/template-functions.php';
 require_once __DIR__ . '/inc/analytics_db.php';
+require_once __DIR__ . '/inc/stripe.php';
+require_once __DIR__ . '/inc/member-levels.php';
 require_once __DIR__ . '/inc/api.php';
 require_once __DIR__ . '/inc/simple-membership.php';
 

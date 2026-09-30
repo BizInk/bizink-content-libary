@@ -1,0 +1,577 @@
+{
+  "key": "group_6bd1000000001",
+  "title": "Member Level Pricing",
+  "fields": [
+    {
+      "key": "field_6bd1000000002",
+      "label": "Description",
+      "name": "description",
+      "aria-label": "",
+      "type": "textarea",
+      "instructions": "Shown to members when choosing a plan.",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "default_value": "",
+      "maxlength": "",
+      "allow_in_bindings": 0,
+      "rows": 3,
+      "placeholder": "",
+      "new_lines": ""
+    },
+    {
+      "key": "field_6bd1000000003",
+      "label": "Monthly price",
+      "name": "monthly_price",
+      "aria-label": "",
+      "type": "group",
+      "instructions": "Leave a currency blank to hide it for this level.",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "layout": "table",
+      "sub_fields": [
+        {
+          "key": "field_6bd1000000004",
+          "label": "USD",
+          "name": "usd",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "$",
+          "append": ""
+        },
+        {
+          "key": "field_6bd1000000005",
+          "label": "AUD",
+          "name": "aud",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "$",
+          "append": ""
+        },
+        {
+          "key": "field_6bd1000000006",
+          "label": "NZD",
+          "name": "nzd",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "$",
+          "append": ""
+        },
+        {
+          "key": "field_6bd1000000007",
+          "label": "EUR",
+          "name": "eur",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "€",
+          "append": ""
+        },
+        {
+          "key": "field_6bd1000000008",
+          "label": "GBP",
+          "name": "gbp",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "£",
+          "append": ""
+        }
+      ]
+    },
+    {
+      "key": "field_6bd1000000009",
+      "label": "Yearly price",
+      "name": "yearly_price",
+      "aria-label": "",
+      "type": "group",
+      "instructions": "Leave a currency blank to hide it for this level.",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "layout": "table",
+      "sub_fields": [
+        {
+          "key": "field_6bd100000000a",
+          "label": "USD",
+          "name": "usd",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "$",
+          "append": ""
+        },
+        {
+          "key": "field_6bd100000000b",
+          "label": "AUD",
+          "name": "aud",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "$",
+          "append": ""
+        },
+        {
+          "key": "field_6bd100000000c",
+          "label": "NZD",
+          "name": "nzd",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "$",
+          "append": ""
+        },
+        {
+          "key": "field_6bd100000000d",
+          "label": "EUR",
+          "name": "eur",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "€",
+          "append": ""
+        },
+        {
+          "key": "field_6bd100000000e",
+          "label": "GBP",
+          "name": "gbp",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "£",
+          "append": ""
+        }
+      ]
+    },
+    {
+      "key": "field_6bd100000000f",
+      "label": "Monthly upfront price",
+      "name": "monthly_upfront_price",
+      "aria-label": "",
+      "type": "group",
+      "instructions": "Optional one-time fee charged with the first payment when a member subscribes monthly. Leave a currency blank for no upfront fee.",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "layout": "table",
+      "sub_fields": [
+        {
+          "key": "field_6bd1000000010",
+          "label": "USD",
+          "name": "usd",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "$",
+          "append": ""
+        },
+        {
+          "key": "field_6bd1000000011",
+          "label": "AUD",
+          "name": "aud",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "$",
+          "append": ""
+        },
+        {
+          "key": "field_6bd1000000012",
+          "label": "NZD",
+          "name": "nzd",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "$",
+          "append": ""
+        },
+        {
+          "key": "field_6bd1000000013",
+          "label": "EUR",
+          "name": "eur",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "€",
+          "append": ""
+        },
+        {
+          "key": "field_6bd1000000014",
+          "label": "GBP",
+          "name": "gbp",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "£",
+          "append": ""
+        }
+      ]
+    },
+    {
+      "key": "field_6bd1000000015",
+      "label": "Yearly upfront price",
+      "name": "yearly_upfront_price",
+      "aria-label": "",
+      "type": "group",
+      "instructions": "Optional one-time fee charged with the first payment when a member subscribes yearly. Leave a currency blank for no upfront fee.",
+      "required": 0,
+      "conditional_logic": 0,
+      "wrapper": {
+        "width": "",
+        "class": "",
+        "id": ""
+      },
+      "layout": "table",
+      "sub_fields": [
+        {
+          "key": "field_6bd1000000016",
+          "label": "USD",
+          "name": "usd",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "$",
+          "append": ""
+        },
+        {
+          "key": "field_6bd1000000017",
+          "label": "AUD",
+          "name": "aud",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "$",
+          "append": ""
+        },
+        {
+          "key": "field_6bd1000000018",
+          "label": "NZD",
+          "name": "nzd",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "$",
+          "append": ""
+        },
+        {
+          "key": "field_6bd1000000019",
+          "label": "EUR",
+          "name": "eur",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "€",
+          "append": ""
+        },
+        {
+          "key": "field_6bd100000001a",
+          "label": "GBP",
+          "name": "gbp",
+          "aria-label": "",
+          "type": "number",
+          "instructions": "",
+          "required": 0,
+          "conditional_logic": 0,
+          "wrapper": {
+            "width": "",
+            "class": "",
+            "id": ""
+          },
+          "default_value": "",
+          "min": 0,
+          "max": "",
+          "allow_in_bindings": 0,
+          "placeholder": "",
+          "step": 0.01,
+          "prepend": "£",
+          "append": ""
+        }
+      ]
+    }
+  ],
+  "location": [
+    [
+      {
+        "param": "post_type",
+        "operator": "==",
+        "value": "bcl_member_level"
+      }
+    ]
+  ],
+  "menu_order": 0,
+  "position": "normal",
+  "style": "default",
+  "label_placement": "top",
+  "instruction_placement": "label",
+  "hide_on_screen": "",
+  "active": true,
+  "description": "",
+  "show_in_rest": 1
+}
