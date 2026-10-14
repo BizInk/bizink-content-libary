@@ -673,7 +673,7 @@ function bcl_content_regions(WP_REST_Request $request)
         return $response;
     }
 
-    $response = new WP_REST_Response($term_query->terms ?? [], 200);
+    $response = new WP_REST_Response(array_values($term_query->terms ?? []), 200);
     $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
     return $response;
 }
@@ -698,7 +698,7 @@ function bcl_content_topics(WP_REST_Request $request)
         return $response;
     }
 
-    $response = new WP_REST_Response($term_query->terms ?? [], 200);
+    $response = new WP_REST_Response(array_values($term_query->terms ?? []), 200);
     $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
     return $response;
 }
@@ -709,7 +709,11 @@ function bcl_content_item_all(WP_REST_Request $request)
 
     $args = array(
         'posts_per_page' => empty($parameters['per_page']) ? 20 : $parameters['per_page'],
-        'post_type' => empty($parameters['content_type']) ? ['bcl_article', 'bcl_ebook', 'bcl_calculator', 'bcl_tool', 'bcl_pdf', 'bcl_excel'] : $parameters['content_type']
+        'post_type' => empty($parameters['content_type']) ? ['bcl_article', 'bcl_ebook', 'bcl_calculator', 'bcl_tool', 'bcl_pdf', 'bcl_excel'] : $parameters['content_type'],
+        // Newest first by default (used by the dashboard "Recently added" list);
+        // featured/search below override this.
+        'orderby' => 'date',
+        'order' => 'DESC'
     );
 
     if (isset($parameters['featured']) && $parameters['featured'] == true) {
@@ -983,6 +987,7 @@ function bcl_content_item(WP_REST_Request $request)
             "content" => bcl_calculator_code($post, $calculator_fields),
             "excerpt" => $post->post_excerpt,
             "published_date" => $post->post_date,
+            "modified_date" => $post->post_modified,
             "user_settings" => $user_settings,
             "meta" => array(
                 "content_type" => $post->post_type,
