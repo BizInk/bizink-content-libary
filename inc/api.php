@@ -754,14 +754,14 @@ function bcl_content_item_all(WP_REST_Request $request)
                     )
                 );
                 if (isset($fields['read_time'])) {
-                    $data['meta']['read_time'] = $fields['read_time'];
+                    $d['meta']['read_time'] = $fields['read_time'];
                 } else {
-                    $data['meta']['read_time'] = 0;
+                    $d['meta']['read_time'] = 0;
                 }
                 if (isset($fields['download_links'])) {
-                    $data['meta']['download_links'] = $fields['download_links'];
+                    $d['meta']['download_links'] = $fields['download_links'];
                 } else {
-                    $data['meta']['download_links'] = [];
+                    $d['meta']['download_links'] = [];
                 }
                 array_push($postData, $d);
             }
@@ -991,6 +991,10 @@ function bcl_content_item(WP_REST_Request $request)
                 'defaultValues' => $fields['defaultValues'] ?? []
             )
         );
+        $topics = wp_get_post_terms($post->ID, 'bcl_topic');
+        $data['meta']['topics'] = is_wp_error($topics) ? [] : array_map(function ($t) {
+            return array('slug' => $t->slug, 'name' => $t->name);
+        }, $topics);
         if (isset($fields['enable_whats_inside_items']) && ($fields['enable_whats_inside_items'] == true || $fields['enable_whats_inside_items'] == 'yes')) {
             if ($fields['whats_inside']) {
                 $data['meta']['whats_inside'] = $fields['whats_inside'];

@@ -4,7 +4,7 @@
  Plugin URI:  https://portal.bizinkonline.com/
  Description: Bizink Content Libary Server Plugin
  Author:      Jayden Major
- Version:     0.1.9
+ Version:     0.2
  Author URI:  https://portal.bizinkonline.com/
  Text Domain: bizink-content
  License:     GPLv2 or later
@@ -18,6 +18,7 @@ require_once __DIR__ . '/inc/stripe.php';
 require_once __DIR__ . '/inc/member-levels.php';
 require_once __DIR__ . '/inc/api.php';
 require_once __DIR__ . '/inc/simple-membership.php';
+require_once __DIR__ . '/inc/article-migration.php';
 
 register_activation_hook(__FILE__, 'bcl_create_database_table');
 
