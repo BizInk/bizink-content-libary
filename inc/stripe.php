@@ -324,13 +324,21 @@ function bcl_stripe_store_subscription($user_id, array $subscription)
     update_user_meta($user_id, 'bcl_stripe_subscription_status', $subscription['status']);
     update_user_meta($user_id, 'bcl_stripe_cancel_at_period_end', !empty($subscription['cancel_at_period_end']));
 
-    if (!empty($subscription['current_period_end'])) {
-        update_user_meta($user_id, 'bcl_stripe_current_period_end', (int) $subscription['current_period_end']);
+    $item = $subscription['items']['data'][0] ?? null;
+
+    // Newer Stripe API versions moved current_period_end onto the subscription item.
+    $period_end = $subscription['current_period_end'] ?? ($item['current_period_end'] ?? null);
+    if (!empty($period_end)) {
+        update_user_meta($user_id, 'bcl_stripe_current_period_end', (int) $period_end);
     }
 
-    $item = $subscription['items']['data'][0] ?? null;
+    update_user_meta($user_id, 'bcl_stripe_trial_end', !empty($subscription['trial_end']) ? (int) $subscription['trial_end'] : '');
+
     if ($item) {
         $price = $item['price'] ?? array();
+        if (isset($price['unit_amount'])) {
+            update_user_meta($user_id, 'bcl_stripe_price_amount', (int) $price['unit_amount'] * (int) ($item['quantity'] ?? 1));
+        }
         if (!empty($price['currency'])) {
             update_user_meta($user_id, 'bcl_stripe_currency', strtoupper($price['currency']));
         }

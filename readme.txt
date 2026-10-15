@@ -20,6 +20,8 @@ Bizink Portal
 * Fixes
 * Related Article
 * Article Import
+* Billing Update
+* Branding Chat & Images
 
 = 0.1.9 =
 * Filter Email

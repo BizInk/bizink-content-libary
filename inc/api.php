@@ -1181,6 +1181,8 @@ function bcl_firm_subscription(WP_REST_Request $request)
     $period_end = (int) get_user_meta($user_id, 'bcl_stripe_current_period_end', true);
     $exp_month  = get_user_meta($user_id, 'bcl_stripe_card_exp_month', true);
     $exp_year   = get_user_meta($user_id, 'bcl_stripe_card_exp_year', true);
+    $amount     = get_user_meta($user_id, 'bcl_stripe_price_amount', true);
+    $trial_end  = (int) get_user_meta($user_id, 'bcl_stripe_trial_end', true);
 
     $response = new WP_REST_Response(array(
         "has_subscription"     => !empty($subscription_id),
@@ -1189,6 +1191,8 @@ function bcl_firm_subscription(WP_REST_Request $request)
         "member_level_name"    => $level_id ? get_the_title($level_id) : null,
         "billing_interval"     => get_user_meta($user_id, 'bcl_stripe_billing_interval', true) ?: null,
         "currency"             => get_user_meta($user_id, 'bcl_stripe_currency', true) ?: null,
+        "amount"               => $amount !== '' ? (int) $amount : null,
+        "trial_end"            => $trial_end ?: null,
         "current_period_end"   => $period_end ?: null,
         "cancel_at_period_end" => (bool) get_user_meta($user_id, 'bcl_stripe_cancel_at_period_end', true),
         "card" => array(
@@ -1202,6 +1206,76 @@ function bcl_firm_subscription(WP_REST_Request $request)
     // Set headers.
     $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
 
+    return $response;
+}
+
+/**
+ * GET — the current member's Stripe invoices, newest first. Paginate by
+ * passing the last returned invoice id as `starting_after`.
+ */
+function bcl_firm_invoices(WP_REST_Request $request)
+{
+    $user_id = get_current_user_id();
+    if (!$user_id) {
+        return bcl_stripe_error_response('User Not Found', 404);
+    }
+
+    $customer_id = get_user_meta($user_id, 'bcl_stripe_customer_id', true);
+    if (empty($customer_id) || empty(bcl_stripe_option('secret_key'))) {
+        $response = new WP_REST_Response(array('invoices' => array(), 'has_more' => false), 200);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    $params = array(
+        'customer' => $customer_id,
+        'limit'    => min(max(absint($request->get_param('limit')) ?: 12, 1), 100),
+    );
+    $starting_after = sanitize_text_field($request->get_param('starting_after') ?? '');
+    if ($starting_after !== '') {
+        $params['starting_after'] = $starting_after;
+    }
+
+    $result = bcl_stripe_request('GET', 'invoices', $params);
+    if (is_wp_error($result)) {
+        return bcl_stripe_error_response($result->get_error_message(), 502);
+    }
+
+    $invoices = array();
+    foreach ($result['data'] ?? array() as $invoice) {
+        // Drafts aren't finalised yet, so they aren't real invoices to the member.
+        if (($invoice['status'] ?? '') === 'draft') {
+            continue;
+        }
+        $line = $invoice['lines']['data'][0] ?? array();
+        $invoices[] = array(
+            'id'                 => $invoice['id'],
+            'number'             => $invoice['number'] ?? null,
+            'status'             => $invoice['status'] ?? null,
+            'created'            => (int) ($invoice['created'] ?? 0),
+            'due_date'           => !empty($invoice['due_date']) ? (int) $invoice['due_date'] : null,
+            'period_start'       => !empty($line['period']['start']) ? (int) $line['period']['start'] : null,
+            'period_end'         => !empty($line['period']['end']) ? (int) $line['period']['end'] : null,
+            'description'        => $invoice['description'] ?? ($line['description'] ?? null),
+            'currency'           => strtoupper($invoice['currency'] ?? ''),
+            'total'              => (int) ($invoice['total'] ?? 0),
+            'amount_paid'        => (int) ($invoice['amount_paid'] ?? 0),
+            'amount_due'         => (int) ($invoice['amount_due'] ?? 0),
+            'hosted_invoice_url' => $invoice['hosted_invoice_url'] ?? null,
+            'invoice_pdf'        => $invoice['invoice_pdf'] ?? null,
+        );
+    }
+
+    $data_list = $result['data'] ?? array();
+    $last      = end($data_list);
+
+    $response = new WP_REST_Response(array(
+        'invoices' => $invoices,
+        'has_more' => !empty($result['has_more']),
+        // Cursor is the last Stripe invoice fetched (drafts included), so paging never skips any.
+        'next_cursor' => !empty($result['has_more']) && $last ? $last['id'] : null,
+    ), 200);
+    $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
     return $response;
 }
 
@@ -1695,7 +1769,7 @@ function bcl_branding_request(WP_REST_Request $request)
                     "status"          => $fields['status'] ?? '',
                     "content_item_id" => $fields['content_item_id'],
                     "notes"           => $fields['notes'] ?? '',
-                    "images"          => $fields['images'] ?? array(),
+                    "images"          => bcl_branding_request_images($post->ID),
                     "download_url"    => $fields['download_url'] ?? '',
                     "created_date"    => $post->post_date,
                 );
@@ -1777,6 +1851,212 @@ function bcl_branding_request(WP_REST_Request $request)
     }
 }
 
+/**
+ * Normalise the ACF "images" repeater into a flat list the portal can render.
+ */
+function bcl_branding_request_images($post_id): array
+{
+    $rows = get_field('images', $post_id);
+    $images = array();
+    foreach ((array) $rows as $row) {
+        $image = $row['image'] ?? null;
+        $attachment_id = is_array($image) ? (int) ($image['ID'] ?? $image['id'] ?? 0) : (int) $image;
+        if (!$attachment_id) {
+            continue;
+        }
+        $url = wp_get_attachment_url($attachment_id);
+        if (!$url) {
+            continue;
+        }
+        $thumb = wp_get_attachment_image_src($attachment_id, 'medium');
+        $images[] = array(
+            "id"        => $attachment_id,
+            "url"       => $url,
+            "thumbnail" => $thumb ? $thumb[0] : $url,
+            "filename"  => basename(get_attached_file($attachment_id) ?: $url),
+            "mime_type" => get_post_mime_type($attachment_id),
+        );
+    }
+    return $images;
+}
+
+/**
+ * Sideload uploaded files and append them to the request's "images" repeater.
+ * Returns the number of files added.
+ */
+function bcl_branding_request_add_images($post_id, array $attachments): int
+{
+    require_once ABSPATH . 'wp-admin/includes/file.php';
+    require_once ABSPATH . 'wp-admin/includes/image.php';
+    require_once ABSPATH . 'wp-admin/includes/media.php';
+
+    $images = array();
+    foreach (bcl_branding_request_images($post_id) as $existing) {
+        $images[] = array('image' => $existing['id']);
+    }
+
+    $added = 0;
+    foreach ($attachments as $file) {
+        if (empty($file['tmp_name']) || !empty($file['error'])) {
+            continue;
+        }
+        $attachment_id = media_handle_sideload($file, $post_id);
+        if (!is_wp_error($attachment_id)) {
+            $images[] = array('image' => $attachment_id);
+            $added++;
+        }
+    }
+
+    if ($added) {
+        update_field('images', $images, $post_id);
+    }
+    return $added;
+}
+
+function bcl_branding_request_format(WP_Post $post): array
+{
+    $fields = get_fields($post->ID);
+    return array(
+        "id"              => $post->ID,
+        "title"           => $post->post_title,
+        "status"          => $fields['status'] ?? '',
+        "content_item_id" => $fields['content_item_id'] ?? null,
+        "notes"           => $fields['notes'] ?? '',
+        "images"          => bcl_branding_request_images($post->ID),
+        "download_url"    => $fields['download_url'] ?? '',
+        "created_date"    => $post->post_date,
+        "modified_date"   => $post->post_modified,
+    );
+}
+
+/**
+ * Chat messages are stored as one "bcl_message" post meta row per message
+ * (rather than WP comments) so they are never exposed via /wp/v2/comments.
+ */
+function bcl_branding_request_messages($post_id): array
+{
+    $messages = array();
+    foreach ((array) get_post_meta($post_id, 'bcl_message', false) as $msg) {
+        if (!is_array($msg) || empty($msg['message'])) {
+            continue;
+        }
+        $user = get_userdata((int) ($msg['user_id'] ?? 0));
+        $messages[] = array(
+            "id"          => $msg['id'] ?? '',
+            "user_id"     => (int) ($msg['user_id'] ?? 0),
+            "author_name" => $user ? $user->display_name : ($msg['author_name'] ?? 'Unknown'),
+            "is_admin"    => !empty($msg['is_admin']),
+            "message"     => $msg['message'],
+            "created"     => $msg['created'] ?? '',
+        );
+    }
+    return $messages;
+}
+
+function bcl_branding_request_add_message($post_id, $user_id, string $message, bool $touch_post = true): array
+{
+    $is_admin = user_can($user_id, 'edit_others_posts');
+    $user = get_userdata($user_id);
+    $msg = array(
+        "id"          => wp_generate_uuid4(),
+        "user_id"     => (int) $user_id,
+        "author_name" => $user ? $user->display_name : '',
+        "is_admin"    => $is_admin,
+        "message"     => $message,
+        "created"     => current_time('mysql'),
+    );
+    add_post_meta($post_id, 'bcl_message', $msg);
+
+    // Flag whose turn it is, unless the request is already closed.
+    $status = get_field('status', $post_id);
+    if (!in_array($status, array('done', 'cancelled'), true)) {
+        update_field('status', $is_admin ? 'adminResponse' : 'clientResponse', $post_id);
+    }
+    if ($touch_post) {
+        wp_update_post(array('ID' => $post_id));
+    }
+
+    return $msg;
+}
+
+/**
+ * Load a branding request the current user may access (its author, or staff).
+ * Returns the WP_Post or a WP_REST_Response error.
+ */
+function bcl_branding_request_for_user(WP_REST_Request $request)
+{
+    $user_id = get_current_user_id();
+    if (!$user_id) {
+        $response = new WP_REST_Response(array("message" => "User Not Found"), 404);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+    if (!function_exists('get_fields') || !function_exists('update_field')) {
+        return bcl_noAcfResponce();
+    }
+
+    $request_id = absint($request->get_param('id'));
+    $post = $request_id ? get_post($request_id) : null;
+    if (!$post || $post->post_type !== 'bcl_request') {
+        $response = new WP_REST_Response(array("message" => "Branding request not found"), 404);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+    if ((int) $post->post_author !== $user_id && !current_user_can('edit_others_posts')) {
+        $response = new WP_REST_Response(array("message" => "You do not have permission to view this request"), 403);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+    return $post;
+}
+
+function bcl_branding_request_images_upload(WP_REST_Request $request)
+{
+    $post = bcl_branding_request_for_user($request);
+    if ($post instanceof WP_REST_Response) {
+        return $post;
+    }
+
+    $files = $request->get_file_params();
+    $attachments = bcl_reshape_uploaded_files($files['attachments'] ?? array());
+    if (empty($attachments) || !bcl_branding_request_add_images($post->ID, $attachments)) {
+        $response = new WP_REST_Response(array("message" => "No valid images uploaded"), 400);
+        $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+        return $response;
+    }
+
+    wp_update_post(array('ID' => $post->ID));
+
+    $response = new WP_REST_Response(bcl_branding_request_format(get_post($post->ID)), 200);
+    $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+    return $response;
+}
+
+function bcl_branding_request_chat(WP_REST_Request $request)
+{
+    $post = bcl_branding_request_for_user($request);
+    if ($post instanceof WP_REST_Response) {
+        return $post;
+    }
+
+    if ($request->get_method() === 'POST') {
+        $message = trim(sanitize_textarea_field($request->get_param('message') ?? ''));
+        if ($message === '') {
+            $response = new WP_REST_Response(array("message" => "Message cannot be empty"), 400);
+            $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+            return $response;
+        }
+        bcl_branding_request_add_message($post->ID, get_current_user_id(), $message);
+    }
+
+    $response = new WP_REST_Response(array(
+        "status"   => get_field('status', $post->ID) ?: '',
+        "messages" => bcl_branding_request_messages($post->ID),
+    ), $request->get_method() === 'POST' ? 201 : 200);
+    $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
+    return $response;
+}
+
 function bcl_branding_request_update(WP_REST_Request $request)
 {
     $user_id = get_current_user_id();
@@ -1807,18 +2087,7 @@ function bcl_branding_request_update(WP_REST_Request $request)
     }
 
     if ($request->get_method() === 'GET') {
-        $fields = get_fields($post->ID);
-        $response = new WP_REST_Response(array(
-            "id"              => $post->ID,
-            "title"           => $post->post_title,
-            "status"          => $fields['status'] ?? '',
-            "content_item_id" => $fields['content_item_id'],
-            "notes"           => $fields['notes'] ?? '',
-            "images"          => $fields['images'] ?? array(),
-            "download_url"    => $fields['download_url'] ?? '',
-            "created_date"    => $post->post_date,
-            "modified_date"   => $post->post_modified,
-        ), 200);
+        $response = new WP_REST_Response(bcl_branding_request_format($post), 200);
         $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
         return $response;
     }
@@ -1826,8 +2095,9 @@ function bcl_branding_request_update(WP_REST_Request $request)
     $params  = $request->get_params();
     $updated = false;
 
-    if (isset($params['request_note'])) {
-        update_field('notes', sanitize_textarea_field($params['request_note']), $post->ID);
+    $note = $params['notes'] ?? $params['request_note'] ?? null;
+    if ($note !== null) {
+        update_field('notes', sanitize_textarea_field($note), $post->ID);
         $updated = true;
     }
 
@@ -1846,21 +2116,7 @@ function bcl_branding_request_update(WP_REST_Request $request)
     $files = $request->get_file_params();
     $attachments = bcl_reshape_uploaded_files($files['attachments'] ?? array());
     if (!empty($attachments)) {
-        require_once ABSPATH . 'wp-admin/includes/file.php';
-        require_once ABSPATH . 'wp-admin/includes/image.php';
-        require_once ABSPATH . 'wp-admin/includes/media.php';
-
-        $images = (array) get_field('images', $post->ID);
-        foreach ($attachments as $file) {
-            if (empty($file['tmp_name']) || !empty($file['error'])) {
-                continue;
-            }
-            $attachment_id = media_handle_sideload($file, $post->ID);
-            if (!is_wp_error($attachment_id)) {
-                $images[] = array('image' => $attachment_id);
-            }
-        }
-        update_field('images', $images, $post->ID);
+        bcl_branding_request_add_images($post->ID, $attachments);
         $updated = true;
     }
 
@@ -1872,20 +2128,9 @@ function bcl_branding_request_update(WP_REST_Request $request)
 
     wp_update_post(array('ID' => $post->ID));
 
-    $post    = get_post($post->ID);
-    $fields  = get_fields($post->ID);
-
-    $response = new WP_REST_Response(array(
-        "message"         => "Branding request updated successfully",
-        "id"              => $post->ID,
-        "title"           => $post->post_title,
-        "status"          => $fields['status'] ?? '',
-        "content_item_id" => $fields['content_item_id'],
-        "notes"           => $fields['notes'] ?? '',
-        "images"          => $fields['images'] ?? array(),
-        "download_url"    => $fields['download_url'] ?? '',
-        "created_date"    => $post->post_date,
-        "modified_date"   => $post->post_modified,
+    $response = new WP_REST_Response(array_merge(
+        array("message" => "Branding request updated successfully"),
+        bcl_branding_request_format(get_post($post->ID))
     ), 200);
     $response->set_headers(['Cache-Control' => 'must-revalidate, no-cache, no-store, private']);
     return $response;
@@ -2070,6 +2315,13 @@ add_action('rest_api_init', function () {
     register_rest_route('bcl/v1', '/firm/subscription', array(
         'methods' => array('GET', 'POST', 'PATCH'),
         'callback' => 'bcl_firm_subscription',
+        'permission_callback' => function () {
+            return current_user_can('read');
+        },
+    ));
+    register_rest_route('bcl/v1', '/firm/invoices', array(
+        'methods' => 'GET',
+        'callback' => 'bcl_firm_invoices',
         'permission_callback' => function () {
             return current_user_can('read');
         },
@@ -2268,6 +2520,23 @@ add_action('rest_api_init', function () {
     register_rest_route('bcl/v1', '/branding-requests/(?P<id>\d+)', array(
         'methods' => ['GET', 'PATCH', 'PUT'],
         'callback' => 'bcl_branding_request_update',
+        'permission_callback' => function () {
+            return current_user_can('read');
+        },
+    ));
+
+    // Multipart uploads must use POST — PHP does not parse multipart bodies on PATCH/PUT.
+    register_rest_route('bcl/v1', '/branding-requests/(?P<id>\d+)/images', array(
+        'methods' => 'POST',
+        'callback' => 'bcl_branding_request_images_upload',
+        'permission_callback' => function () {
+            return current_user_can('read');
+        },
+    ));
+
+    register_rest_route('bcl/v1', '/branding-requests/(?P<id>\d+)/messages', array(
+        'methods' => ['GET', 'POST'],
+        'callback' => 'bcl_branding_request_chat',
         'permission_callback' => function () {
             return current_user_can('read');
         },
