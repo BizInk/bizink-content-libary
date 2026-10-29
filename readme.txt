@@ -22,6 +22,7 @@ Bizink Portal
 * Article Import
 * Billing Update
 * Branding Chat & Images
+* Default Values Part 1
 
 = 0.1.9 =
 * Filter Email
